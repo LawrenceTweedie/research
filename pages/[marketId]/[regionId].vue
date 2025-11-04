@@ -542,6 +542,21 @@ const isTopYear = (value, data) => {
 
 // Форматирование чисел
 const formatNumber = (num) => {
+  // Если значение пустое или undefined
+  if (!num && num !== 0) return '0'
+
+  // Если это уже строка с пробелами (уже отформатированная)
+  if (typeof num === 'string' && num.includes(' ')) {
+    return num
+  }
+
+  // Если это строка без пробелов, преобразуем в число
+  if (typeof num === 'string') {
+    num = num.replace(/\s/g, '') // Удаляем пробелы на всякий случай
+    num = parseFloat(num)
+  }
+
+  // Форматируем число
   return new Intl.NumberFormat('ru-RU').format(num)
 }
 
