@@ -220,25 +220,21 @@
         <li
           v-for="company in companies"
           :key="company['ИНН']"
-          class="bests__item"
+          class="bests__item company"
         >
-          <div class="company">
             <h4 class="company__name">{{ company['Название компании'] }}</h4>
             <p class="company__inn">ИНН: {{ company['ИНН'] }}</p>
             <p class="company__fund">{{ formatNumber(company['Объем выручки 2024']) }} тыс. руб.</p>
-          </div>
         </li>
         <!-- Заполняем пустые слоты до 10 -->
         <li
           v-for="i in Math.max(0, 10 - companies.length)"
           :key="`empty-${i}`"
-          class="bests__item"
+          class="bests__item company"
         >
-          <div class="company">
             <h4 class="company__name">—</h4>
             <p class="company__inn">—</p>
             <p class="company__fund">—</p>
-          </div>
         </li>
       </ul>
     </div>
