@@ -1,5 +1,65 @@
 <script setup>
+import { ref, onMounted } from 'vue'
+import MarketCard from '~/components/MarketCard.vue'
+import CallbackForm from '~/components/CallbackForm.vue'
 
+// Примеры рынков для отображения на главной странице
+const sampleMarkets = ref([
+  {
+    title: 'Рынок оборудования для очистки жидкостей',
+    emotion: 'negative',
+    marketVolume: '268 млрд руб.',
+    investmentVolume: '463 млрд руб.',
+    profitability: '4%',
+    instability: '48%',
+    link: '/1'
+  },
+  {
+    title: 'Рынок картофеля',
+    emotion: 'negative',
+    marketVolume: '180 млрд руб.',
+    investmentVolume: '320 млрд руб.',
+    profitability: '6%',
+    instability: '42%',
+    link: '/1'
+  },
+  {
+    title: 'Рынок программного обеспечения',
+    emotion: 'positive',
+    marketVolume: '450 млрд руб.',
+    investmentVolume: '680 млрд руб.',
+    profitability: '12%',
+    instability: '28%',
+    link: '/1'
+  },
+  {
+    title: 'Рынок недвижимости',
+    emotion: 'positive',
+    marketVolume: '3.2 трлн руб.',
+    investmentVolume: '1.8 трлн руб.',
+    profitability: '8%',
+    instability: '35%',
+    link: '/1'
+  },
+  {
+    title: 'Рынок электроники',
+    emotion: 'positive',
+    marketVolume: '890 млрд руб.',
+    investmentVolume: '1.2 трлн руб.',
+    profitability: '10%',
+    instability: '30%',
+    link: '/1'
+  },
+  {
+    title: 'Рынок строительных материалов',
+    emotion: 'neutral',
+    marketVolume: '520 млрд руб.',
+    investmentVolume: '720 млрд руб.',
+    profitability: '5%',
+    instability: '40%',
+    link: '/1'
+  }
+])
 </script>
 
 <template>
@@ -467,7 +527,11 @@
           </div><a class="button markets__header-link button button--lg button--cold" title="text" href="#!">Смотреть все</a>
         </div>
         <ul class="markets__list">
-          <li class="markets__item"> <a class="market-card markets__item-card market-card--negative" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
+          <li v-for="(market, index) in sampleMarkets" :key="index" class="markets__item">
+            <MarketCard :market="market" />
+          </li>
+          <!-- Статичный пример для демонстрации (можно удалить) -->
+          <!-- <li class="markets__item"> <a class="market-card markets__item-card market-card--negative" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
             <div class="market-card__icon">
               <svg aria-hidden="true">
                 <use xlink:href="#icon-arrow--link"></use>
@@ -742,7 +806,7 @@
                 <div class="market-card__item-number">48%</div>
               </li>
             </ul></a>
-          </li>
+          </li> -->
         </ul>
         <div class="pagination pagination--grid markets__pagination">
           <div class="pagination__info">1-10 of 1,250</div>
@@ -879,72 +943,7 @@
         </ul>
       </div>
     </section>
-    <section class="callback-form" id="callback-form">
-      <div class="container callback-form__container">
-        <h2 class="callback-form__title title">Контакты</h2>
-        <div class="callback-form__form">
-          <form class="callback-form__form-content form">
-            <div class="form__row">
-              <div class="form__field">
-                <div class="form__field-title">Ваше имя</div>
-                <div class="custom-field">
-                  <input class="custom-field__input" id="user-name" name="callback-form-name" type="text" placeholder="Как вас зовут?" data-validate="text" data-required>
-                  <div class="empty">Необходимо заполнить</div>
-                </div>
-              </div>
-              <div class="form__field">
-                <div class="form__field-title">Фамилия</div>
-                <div class="custom-field">
-                  <input class="custom-field__input" id="user-last-name" name="callback-form-last-name" type="text" placeholder="Ваша фамилия">
-                </div>
-              </div>
-            </div>
-            <div class="form__row">
-              <div class="form__field">
-                <div class="form__field-title">Почтовый адрес</div>
-                <div class="custom-field">
-                  <input class="custom-field__input" id="user-email" name="callback-form-email" type="text" placeholder="example@gmail.com" data-validate="email" data-required>
-                  <div class="error">Некорректно заполнено</div>
-                  <div class="empty">Необходимо заполнить</div>
-                </div>
-              </div>
-              <div class="form__field">
-                <div class="form__field-title">Телефон</div>
-                <div class="custom-field">
-                  <input class="custom-field__input" id="user-phone" name="callback-form-phone" type="text" placeholder="+7 ___ ___ __ __" data-base-country-code="+7" data-base-matrix-mask=" ___ ___ __ __" data-validate="phone" data-required>
-                  <div class="error">Некорректно заполнено</div>
-                  <div class="empty">Необходимо заполнить</div>
-                </div>
-              </div>
-            </div>
-            <div class="form__field">
-              <div class="form__field-title">Предмет ислледования</div>
-              <div class="custom-field custom-field--textarea">
-                <textarea class="custom-field__input" id="user-description" name="callback-form-description" placeholder="Краткое описание продукта/услуги, рынка, отрасли..."></textarea>
-              </div>
-            </div>
-            <div class="form__footer">
-              <label class="custom-field custom-field--checkbox" for="user-agreement-0">
-                <input class="visually-hidden" id="user-agreement-0" name="form-agreement" type="checkbox" data-validate="checkbox" data-required><span class="custom-field__icon">
-                      <svg width="24" height="24" aria-hidden="true">
-                        <use xlink:href="#icon-check"></use>
-                      </svg></span><span class="custom-field__text">Я ознакомлен с политикой конфиденциальности и даю согласие на обработку персональных данных</span>
-                <div class="empty">Необходимо дать согласие</div>
-              </label>
-              <button class="button form__submit button button--lg button--cold" title="text" type="submit">Оставить заявку</button>
-            </div>
-          </form>
-          <div class="callback-form__form-aside"><img src="/img/content/pictures/computer.png" srcset="/img/content/pictures/computer@2x.png 2x" width="657" height="552" alt="Заголовок">
-            <div class="callback-form__form-aside-sended">
-              <svg width="48" height="48" aria-hidden="true">
-                <use xlink:href="#icon-handshake"></use>
-              </svg>
-              <p>Мы&nbsp;свяжемся с&nbsp;вами в&nbsp;ближайшее время! <br>А&nbsp;также мы&nbsp;обещаем не&nbsp;беспокоить вас со&nbsp;всякой ерундой;) <br><br>С&nbsp;уважением, команда Inresearch</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <CallbackForm />
   </main>
 </template>
 

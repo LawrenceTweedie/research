@@ -143,24 +143,28 @@ const router = useRouter()
 
 // Состояния
 const marketsData = ref({})
+const marketsIdMapping = ref({})
 const regionsData = ref([])
 const isMarketSelectOpen = ref(false)
 const isRegionSelectOpen = ref(false)
 const marketSearchQuery = ref('')
 const regionSearchQuery = ref('')
 const selectedMarket = ref(null)
+const selectedMarketId = ref(null)
 const selectedRegion = ref(null)
 
 // Загрузка данных при монтировании компонента
 onMounted(async () => {
   try {
-    const [marketsResponse, regionsResponse] = await Promise.all([
+    const [marketsResponse, regionsResponse, marketsIdResponse] = await Promise.all([
       fetch('/data/search.json'),
-      fetch('/data/regions.json')
+      fetch('/data/regions.json'),
+      fetch('/data/markets.json')
     ])
 
     marketsData.value = await marketsResponse.json()
     regionsData.value = await regionsResponse.json()
+    marketsIdMapping.value = await marketsIdResponse.json()
   } catch (error) {
     console.error('Ошибка загрузки данных:', error)
   }
@@ -225,6 +229,13 @@ const selectMarket = (market) => {
   selectedMarket.value = market
   marketSearchQuery.value = market
   isMarketSelectOpen.value = false
+
+  // Находим ID рынка
+  const marketId = Object.keys(marketsIdMapping.value).find(
+    id => marketsIdMapping.value[id] === market
+  )
+  selectedMarketId.value = marketId || '1'
+
   // Сброс выбранного региона при смене рынка
   selectedRegion.value = null
   regionSearchQuery.value = ''
@@ -237,10 +248,10 @@ const selectRegion = (region) => {
 }
 
 const handleSearch = () => {
-  if (!selectedMarket.value) return
+  if (!selectedMarket.value || !selectedMarketId.value) return
 
-  // Получаем ID рынка (название рынка как ID)
-  const marketId = selectedMarket.value
+  // Получаем ID рынка
+  const marketId = selectedMarketId.value
 
   // Получаем ID региона из regionsData
   let regionId = null
@@ -251,10 +262,10 @@ const handleSearch = () => {
     }
   }
 
-  // Формируем URL
+  // Формируем URL: /id_рынка или /id_рынка/id_региона
   const url = regionId
-    ? `/${encodeURIComponent(marketId)}/${regionId}`
-    : `/${encodeURIComponent(marketId)}`
+    ? `/${marketId}/${regionId}`
+    : `/${marketId}`
 
   // Переходим на страницу
   router.push(url)
