@@ -371,110 +371,83 @@ const descriptionRest = computed(() => {
   return marketDescription.value.substring(200)
 })
 
-// Загрузка данных
-onMounted(async () => {
-  try {
-    // Загружаем основные данные
-    const [searchRes, regionsRes, marketsIdRes] = await Promise.all([
-      fetch('/data/search.json'),
-      fetch('/data/regions.json'),
-      fetch('/data/markets.json')
-    ])
-
-    searchData.value = await searchRes.json()
-    regionsData.value = await regionsRes.json()
-    marketsIdMapping.value = await marketsIdRes.json()
-
-    // Получаем название рынка
-    marketName.value = marketsIdMapping.value[marketId.value] || 'Неизвестный рынок'
-
-    // Получаем название региона
-    if (regionId.value) {
-      const region = regionsData.value.find(r => r[0] === regionId.value)
-      if (region) {
-        regionName.value = region[1]
-        selectedRegionName.value = region[1]
-      }
-    }
-
-    // Получаем доступные регионы для этого рынка
-    const regionNames = searchData.value[marketName.value] || []
-    availableRegions.value = regionsData.value.filter(r => regionNames.includes(r[1]))
-
-    // Загружаем данные рынка
-    await loadMarketData()
-  } catch (error) {
-    console.error('Ошибка загрузки данных:', error)
-  }
+// Загрузка базовых данных через API
+const { data: baseData } = await useFetch('/api/base-data', {
+  key: 'base-data'
 })
 
-// Загрузка данных рынка
-const loadMarketData = async () => {
-  const mid = marketId.value
+// Загрузка данных рынка через API
+const { data: marketData } = await useFetch(`/api/market/${marketId.value}`, {
+  key: `market-${marketId.value}`
+})
 
-  try {
-    // Виды деятельности
-    const okvRes = await fetch(`/data/${mid}_okv.json`)
-    if (okvRes.ok) {
-      activities.value = await okvRes.json()
+// Инициализация данных после загрузки
+if (baseData.value) {
+  searchData.value = baseData.value.search
+  regionsData.value = baseData.value.regions
+  marketsIdMapping.value = baseData.value.markets
+
+  // Получаем название рынка
+  marketName.value = marketsIdMapping.value[marketId.value] || 'Неизвестный рынок'
+
+  // Получаем название региона
+  if (regionId.value) {
+    const region = regionsData.value.find(r => r[0] === regionId.value)
+    if (region) {
+      regionName.value = region[1]
+      selectedRegionName.value = region[1]
     }
+  }
 
-    // Новости
-    const newsRes = await fetch(`/data/${mid}_news.json`)
-    if (newsRes.ok) {
-      const newsData = await newsRes.json()
-      const newsArray = []
-      let i = 1
-      while (newsData[`header ${i}`]) {
-        newsArray.push({
-          title: newsData[`header ${i}`],
-          link: newsData[`link ${i}`]
-        })
-        i++
-      }
-      news.value = newsArray
-      newsEmotion.value = newsData.emotion || 'нейтрально'
+  // Получаем доступные регионы для этого рынка
+  const regionNames = searchData.value[marketName.value] || []
+  availableRegions.value = regionsData.value.filter(r => regionNames.includes(r[1]))
+}
+
+// Устанавливаем данные рынка
+if (marketData.value) {
+  activities.value = marketData.value.okv || []
+
+  // Обработка новостей
+  const newsData = marketData.value.news
+  if (newsData && typeof newsData === 'object') {
+    const newsArray = []
+    let i = 1
+    while (newsData[`header ${i}`]) {
+      newsArray.push({
+        title: newsData[`header ${i}`],
+        link: newsData[`link ${i}`]
+      })
+      i++
     }
+    news.value = newsArray
+    newsEmotion.value = newsData.emotion || 'нейтрально'
+  }
 
-    // Компании
-    if (regionId.value && regionId.value !== '') {
-      // Для конкретного региона
-      const regionsTop10Res = await fetch(`/data/${mid}_regions_top10.json`)
-      if (regionsTop10Res.ok) {
-        const regionsTop10Data = await regionsTop10Res.json()
-        const region = regionsData.value.find(r => r[0] === regionId.value)
-        if (region && regionsTop10Data[region[1]]) {
-          companies.value = regionsTop10Data[region[1]]
-        }
-      }
-    } else {
-      // Для всей России
-      const top10Res = await fetch(`/data/${mid}_top10.json`)
-      if (top10Res.ok) {
-        companies.value = await top10Res.json()
-      }
-    }
-
-    // Метрики
-    if (regionId.value && regionId.value !== '') {
-      // Для конкретного региона
-      const regionRes = await fetch(`/data/${mid}_region.json`)
-      if (regionRes.ok) {
-        const regionData = await regionRes.json()
-        const region = regionsData.value.find(r => r[0] === regionId.value)
-        if (region && regionData[region[1]]) {
-          metrics.value = regionData[region[1]]
-        }
-      }
-    } else {
-      // Для всей России
-      const metricsRes = await fetch(`/data/${mid}_metrics.json`)
-      if (metricsRes.ok) {
-        metrics.value = await metricsRes.json()
+  // Компании
+  if (regionId.value && regionId.value !== '') {
+    const regionsTop10Data = marketData.value.regionsTop10
+    if (regionsTop10Data && typeof regionsTop10Data === 'object') {
+      const region = regionsData.value.find(r => r[0] === regionId.value)
+      if (region && regionsTop10Data[region[1]]) {
+        companies.value = regionsTop10Data[region[1]]
       }
     }
-  } catch (error) {
-    console.error('Ошибка загрузки данных рынка:', error)
+  } else {
+    companies.value = marketData.value.top10 || []
+  }
+
+  // Метрики
+  if (regionId.value && regionId.value !== '') {
+    const regionData = marketData.value.region
+    if (regionData && typeof regionData === 'object') {
+      const region = regionsData.value.find(r => r[0] === regionId.value)
+      if (region && regionData[region[1]]) {
+        metrics.value = regionData[region[1]]
+      }
+    }
+  } else {
+    metrics.value = marketData.value.metrics || {}
   }
 }
 

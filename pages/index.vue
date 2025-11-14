@@ -27,62 +27,25 @@ const formatNumber = (num) => {
   return new Intl.NumberFormat('ru-RU').format(num)
 }
 
-// Загружаем данные СИНХРОННО при SSG - данные встраиваются прямо в HTML
-// Используем прямой await $fetch вместо useAsyncData чтобы избежать payload
-let marketsData = []
-try {
-  // Загружаем основные данные из публичной директории
-  const marketsRes = await $fetch('/data/markets.json')
-  const searchRes = await $fetch('/data/search.json')
+// Загружаем данные через API для оптимизации SSG
+const { data: allMarkets } = await useFetch('/api/all-markets', {
+  key: 'all-markets'
+})
 
-  // Для каждого рынка загружаем данные
-  const marketPromises = Object.entries(marketsRes).map(async ([marketId, marketName]) => {
-    try {
-      const newsData = await $fetch(`/data/${marketId}_news.json`)
-      const regionData = await $fetch(`/data/${marketId}_region.json`)
-
-      // Получаем агрегированные данные по всей России
-      const firstRegion = Object.keys(regionData)[0]
-      const metrics = firstRegion ? regionData[firstRegion] : {}
-
-      // Определяем emotion для AI и экспертов
-      let emotionAI = 'neutral'
-      let emotionExperts = 'neutral'
-
-      if (newsData.emotion_ai || newsData.emotion_experts) {
-        emotionAI = parseEmotion(newsData.emotion_ai)
-        emotionExperts = parseEmotion(newsData.emotion_experts)
-      } else if (newsData.emotion) {
-        const commonEmotion = parseEmotion(newsData.emotion)
-        emotionAI = commonEmotion
-        emotionExperts = commonEmotion
-      }
-
-      return {
-        id: marketId,
-        title: marketName,
-        emotionAI,
-        emotionExperts,
-        marketVolume: metrics['Объем рынка 2024'] ? `${formatNumber(metrics['Объем рынка 2024'])} тыс. руб.` : 'н/д',
-        investmentVolume: metrics['Объем инвестиций в основной капитал 2024'] ? `${formatNumber(metrics['Объем инвестиций в основной капитал 2024'])} тыс. руб.` : 'н/д',
-        profitability: metrics['Рентабельность рынка 2024'] ? `${metrics['Рентабельность рынка 2024']}%` : 'н/д',
-        instability: metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024'] ? `${metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024']}%` : 'н/д',
-        link: `/${marketId}`,
-        category: marketName,
-        regions: searchRes[marketName] || []
-      }
-    } catch (error) {
-      console.error(`Error loading data for market ${marketId}:`, error)
-      return null
-    }
-  })
-
-  const markets = await Promise.all(marketPromises)
-  marketsData = markets.filter(m => m !== null)
-} catch (error) {
-  console.error('Error loading markets data:', error)
-  marketsData = []
-}
+// Форматируем данные для отображения
+const marketsData = (allMarkets.value || []).map(market => ({
+  id: market.id,
+  title: market.title,
+  emotionAI: parseEmotion(market.emotionAI),
+  emotionExperts: parseEmotion(market.emotionExperts),
+  marketVolume: market.metrics.marketVolume ? `${formatNumber(market.metrics.marketVolume)} тыс. руб.` : 'н/д',
+  investmentVolume: market.metrics.investmentVolume ? `${formatNumber(market.metrics.investmentVolume)} тыс. руб.` : 'н/д',
+  profitability: market.metrics.profitability ? `${market.metrics.profitability}%` : 'н/д',
+  instability: market.metrics.instability ? `${market.metrics.instability}%` : 'н/д',
+  link: market.link,
+  category: market.category,
+  regions: market.regions
+}))
 </script>
 
 <template>
