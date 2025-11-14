@@ -1,65 +1,88 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import MarketCard from '~/components/MarketCard.vue'
 import CallbackForm from '~/components/CallbackForm.vue'
+import MarketsSection from '~/components/MarketsSection.vue'
 
-// Примеры рынков для отображения на главной странице
-const sampleMarkets = ref([
-  {
-    title: 'Рынок оборудования для очистки жидкостей',
-    emotion: 'negative',
-    marketVolume: '268 млрд руб.',
-    investmentVolume: '463 млрд руб.',
-    profitability: '4%',
-    instability: '48%',
-    link: '/1'
-  },
-  {
-    title: 'Рынок картофеля',
-    emotion: 'negative',
-    marketVolume: '180 млрд руб.',
-    investmentVolume: '320 млрд руб.',
-    profitability: '6%',
-    instability: '42%',
-    link: '/1'
-  },
-  {
-    title: 'Рынок программного обеспечения',
-    emotion: 'positive',
-    marketVolume: '450 млрд руб.',
-    investmentVolume: '680 млрд руб.',
-    profitability: '12%',
-    instability: '28%',
-    link: '/1'
-  },
-  {
-    title: 'Рынок недвижимости',
-    emotion: 'positive',
-    marketVolume: '3.2 трлн руб.',
-    investmentVolume: '1.8 трлн руб.',
-    profitability: '8%',
-    instability: '35%',
-    link: '/1'
-  },
-  {
-    title: 'Рынок электроники',
-    emotion: 'positive',
-    marketVolume: '890 млрд руб.',
-    investmentVolume: '1.2 трлн руб.',
-    profitability: '10%',
-    instability: '30%',
-    link: '/1'
-  },
-  {
-    title: 'Рынок строительных материалов',
-    emotion: 'neutral',
-    marketVolume: '520 млрд руб.',
-    investmentVolume: '720 млрд руб.',
-    profitability: '5%',
-    instability: '40%',
-    link: '/1'
+// Функция для определения emotion из текста
+const parseEmotion = (emotionText) => {
+  if (!emotionText) return 'neutral'
+  const text = emotionText.toLowerCase()
+  if (text.includes('позитив') || text.includes('положительно')) {
+    return 'positive'
+  } else if (text.includes('негатив') || text.includes('отрицательно')) {
+    return 'negative'
   }
-])
+  return 'neutral'
+}
+
+// Форматирование чисел
+const formatNumber = (num) => {
+  if (!num && num !== 0) return '0'
+  if (typeof num === 'string' && num.includes(' ')) {
+    return num
+  }
+  if (typeof num === 'string') {
+    num = num.replace(/\s/g, '')
+    num = parseFloat(num)
+  }
+  return new Intl.NumberFormat('ru-RU').format(num)
+}
+
+// Загружаем данные СИНХРОННО при SSG - данные встраиваются прямо в HTML
+// Используем прямой await $fetch вместо useAsyncData чтобы избежать payload
+let marketsData = []
+try {
+  // Загружаем основные данные из публичной директории
+  const marketsRes = await $fetch('/data/markets.json')
+  const searchRes = await $fetch('/data/search.json')
+
+  // Для каждого рынка загружаем данные
+  const marketPromises = Object.entries(marketsRes).map(async ([marketId, marketName]) => {
+    try {
+      const newsData = await $fetch(`/data/${marketId}_news.json`)
+      const regionData = await $fetch(`/data/${marketId}_region.json`)
+
+      // Получаем агрегированные данные по всей России
+      const firstRegion = Object.keys(regionData)[0]
+      const metrics = firstRegion ? regionData[firstRegion] : {}
+
+      // Определяем emotion для AI и экспертов
+      let emotionAI = 'neutral'
+      let emotionExperts = 'neutral'
+
+      if (newsData.emotion_ai || newsData.emotion_experts) {
+        emotionAI = parseEmotion(newsData.emotion_ai)
+        emotionExperts = parseEmotion(newsData.emotion_experts)
+      } else if (newsData.emotion) {
+        const commonEmotion = parseEmotion(newsData.emotion)
+        emotionAI = commonEmotion
+        emotionExperts = commonEmotion
+      }
+
+      return {
+        id: marketId,
+        title: marketName,
+        emotionAI,
+        emotionExperts,
+        marketVolume: metrics['Объем рынка 2024'] ? `${formatNumber(metrics['Объем рынка 2024'])} тыс. руб.` : 'н/д',
+        investmentVolume: metrics['Объем инвестиций в основной капитал 2024'] ? `${formatNumber(metrics['Объем инвестиций в основной капитал 2024'])} тыс. руб.` : 'н/д',
+        profitability: metrics['Рентабельность рынка 2024'] ? `${metrics['Рентабельность рынка 2024']}%` : 'н/д',
+        instability: metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024'] ? `${metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024']}%` : 'н/д',
+        link: `/${marketId}`,
+        category: marketName,
+        regions: searchRes[marketName] || []
+      }
+    } catch (error) {
+      console.error(`Error loading data for market ${marketId}:`, error)
+      return null
+    }
+  })
+
+  const markets = await Promise.all(marketPromises)
+  marketsData = markets.filter(m => m !== null)
+} catch (error) {
+  console.error('Error loading markets data:', error)
+  marketsData = []
+}
 </script>
 
 <template>
@@ -179,682 +202,7 @@ const sampleMarkets = ref([
         </ul>
       </div>
     </section>
-    <section class="markets" id="markets">
-      <div class="container markets__container">
-        <h2 class="markets__title title">Рынки</h2>
-        <div class="markets__header">
-          <div class="custom-select markets__header-cities">
-            <div class="custom-select__trigger">
-              <svg width="24" height="24" aria-hidden="true">
-                <use xlink:href="#icon-location"></use>
-              </svg>
-              <div class="custom-select__trigger-input">
-                <input type="text" name="markets-cities" placeholder="Выберите регион..." autocomplete="off"><span class="custom-select__trigger-input-help"></span>
-              </div>
-              <div class="custom-select__trigger-icon">
-                <svg width="24" height="24" aria-hidden="true">
-                  <use xlink:href="#icon-arrow--select"></use>
-                </svg>
-              </div>
-            </div>
-            <div class="custom-select__dropdown">
-              <ul class="custom-select__list">
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-0">
-                    <input class="visually-hidden" id="markets-cities-0" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Москва</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-1">
-                    <input class="visually-hidden" id="markets-cities-1" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Санкт-Петербург</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-2">
-                    <input class="visually-hidden" id="markets-cities-2" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Новосибирск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-3">
-                    <input class="visually-hidden" id="markets-cities-3" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Екатеринбург</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-4">
-                    <input class="visually-hidden" id="markets-cities-4" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Казань</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-5">
-                    <input class="visually-hidden" id="markets-cities-5" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Нижний Новгород</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-6">
-                    <input class="visually-hidden" id="markets-cities-6" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Челябинск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-7">
-                    <input class="visually-hidden" id="markets-cities-7" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Самара</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-8">
-                    <input class="visually-hidden" id="markets-cities-8" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Уфа</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-9">
-                    <input class="visually-hidden" id="markets-cities-9" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Ростов-на-Дону</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-10">
-                    <input class="visually-hidden" id="markets-cities-10" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Красноярск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-11">
-                    <input class="visually-hidden" id="markets-cities-11" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Пермь</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-12">
-                    <input class="visually-hidden" id="markets-cities-12" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Воронеж</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-13">
-                    <input class="visually-hidden" id="markets-cities-13" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Волгоград</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-14">
-                    <input class="visually-hidden" id="markets-cities-14" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Краснодар</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-15">
-                    <input class="visually-hidden" id="markets-cities-15" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Саратов</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-16">
-                    <input class="visually-hidden" id="markets-cities-16" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Тюмень</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-17">
-                    <input class="visually-hidden" id="markets-cities-17" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Тольятти</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-18">
-                    <input class="visually-hidden" id="markets-cities-18" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Ижевск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-19">
-                    <input class="visually-hidden" id="markets-cities-19" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Барнаул</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-20">
-                    <input class="visually-hidden" id="markets-cities-20" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Ульяновск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-21">
-                    <input class="visually-hidden" id="markets-cities-21" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Иркутск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-22">
-                    <input class="visually-hidden" id="markets-cities-22" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Хабаровск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-23">
-                    <input class="visually-hidden" id="markets-cities-23" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Ярославль</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-24">
-                    <input class="visually-hidden" id="markets-cities-24" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Владивосток</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-25">
-                    <input class="visually-hidden" id="markets-cities-25" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Махачкала</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-26">
-                    <input class="visually-hidden" id="markets-cities-26" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Томск</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-27">
-                    <input class="visually-hidden" id="markets-cities-27" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Оренбург</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-28">
-                    <input class="visually-hidden" id="markets-cities-28" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Кемерово</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-cities-29">
-                    <input class="visually-hidden" id="markets-cities-29" name="markets-cities" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Новокузнецк</span>
-                  </label>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div class="custom-select markets__header-categories">
-            <div class="custom-select__trigger">
-              <svg width="24" height="24" aria-hidden="true">
-                <use xlink:href="#icon-grid"></use>
-              </svg>
-              <div class="custom-select__trigger-input">
-                <input type="text" name="markets-categories" placeholder="Выберите категорию рынка - например, “Рынок недвижимости”..." autocomplete="off"><span class="custom-select__trigger-input-help"></span>
-              </div>
-              <div class="custom-select__trigger-icon">
-                <svg width="24" height="24" aria-hidden="true">
-                  <use xlink:href="#icon-arrow--select"></use>
-                </svg>
-              </div>
-            </div>
-            <div class="custom-select__dropdown">
-              <ul class="custom-select__list">
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-0">
-                    <input class="visually-hidden" id="markets-categories-0" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Фото / кинооборудование</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-1">
-                    <input class="visually-hidden" id="markets-categories-1" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Компьютерные игры</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-2">
-                    <input class="visually-hidden" id="markets-categories-2" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Дизайнерские услуги</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-3">
-                    <input class="visually-hidden" id="markets-categories-3" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Инвестиции</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-4">
-                    <input class="visually-hidden" id="markets-categories-4" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Недвижимость</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-5">
-                    <input class="visually-hidden" id="markets-categories-5" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Медицинское оборудование</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-6">
-                    <input class="visually-hidden" id="markets-categories-6" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Смартфоны и Гаджеты</span>
-                  </label>
-                </li>
-                <li class="custom-select__item">
-                  <label class="custom-field custom-field--checkbox" for="markets-categories-7">
-                    <input class="visually-hidden" id="markets-categories-7" name="markets-categories" type="radio" autocomplete="off"><span class="custom-field__icon">
-                          <svg width="24" height="24" aria-hidden="true">
-                            <use xlink:href="#icon-check"></use>
-                          </svg></span><span class="custom-field__text">Спецтехника</span>
-                  </label>
-                </li>
-              </ul>
-            </div>
-          </div><a class="button markets__header-link button button--lg button--cold" title="text" href="#!">Смотреть все</a>
-        </div>
-        <ul class="markets__list">
-          <li v-for="(market, index) in sampleMarkets" :key="index" class="markets__item">
-            <MarketCard :market="market" />
-          </li>
-          <!-- Статичный пример для демонстрации (можно удалить) -->
-          <!-- <li class="markets__item"> <a class="market-card markets__item-card market-card--negative" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
-            <div class="market-card__icon">
-              <svg aria-hidden="true">
-                <use xlink:href="#icon-arrow--link"></use>
-              </svg>
-            </div>
-            <div class="market-card__title">Рынок оборудования для очистки жидкостей<span class="color--gray">2024</span></div>
-            <ul class="market-card__state">
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-brain"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">AI:</div>
-                <div class="market-card__state-item-text">Негативно</div>
-              </li>
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-expert"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">Эксперты:</div>
-                <div class="market-card__state-item-text">Негативно</div>
-              </li>
-            </ul>
-            <ul class="market-card__list">
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем рынка:</div>
-                <div class="market-card__item-number">268 млрд руб. </div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем инвестиций:</div>
-                <div class="market-card__item-number">463 млрд руб.</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Среднерыночная рентабельность:</div>
-                <div class="market-card__item-number">4%</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Уровень финансовой нестабильности:</div>
-                <div class="market-card__item-number">48%</div>
-              </li>
-            </ul></a>
-          </li>
-          <li class="markets__item"> <a class="market-card markets__item-card market-card--negative" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
-            <div class="market-card__icon">
-              <svg aria-hidden="true">
-                <use xlink:href="#icon-arrow--link"></use>
-              </svg>
-            </div>
-            <div class="market-card__title">Рынок оборудования для очистки жидкостей<span class="color--gray">2024</span></div>
-            <ul class="market-card__state">
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-brain"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">AI:</div>
-                <div class="market-card__state-item-text">Негативно</div>
-              </li>
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-expert"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">Эксперты:</div>
-                <div class="market-card__state-item-text">Негативно</div>
-              </li>
-            </ul>
-            <ul class="market-card__list">
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем рынка:</div>
-                <div class="market-card__item-number">268 млрд руб. </div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем инвестиций:</div>
-                <div class="market-card__item-number">463 млрд руб.</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Среднерыночная рентабельность:</div>
-                <div class="market-card__item-number">4%</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Уровень финансовой нестабильности:</div>
-                <div class="market-card__item-number">48%</div>
-              </li>
-            </ul></a>
-          </li>
-          <li class="markets__item"> <a class="market-card markets__item-card market-card--positive" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
-            <div class="market-card__icon">
-              <svg aria-hidden="true">
-                <use xlink:href="#icon-arrow--link"></use>
-              </svg>
-            </div>
-            <div class="market-card__title">Рынок оборудования для очистки жидкостей<span class="color--gray">2024</span></div>
-            <ul class="market-card__state">
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-brain"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">AI:</div>
-                <div class="market-card__state-item-text">Положительно</div>
-              </li>
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-expert"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">Эксперты:</div>
-                <div class="market-card__state-item-text">Положительно</div>
-              </li>
-            </ul>
-            <ul class="market-card__list">
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем рынка:</div>
-                <div class="market-card__item-number">268 млрд руб. </div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем инвестиций:</div>
-                <div class="market-card__item-number">463 млрд руб.</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Среднерыночная рентабельность:</div>
-                <div class="market-card__item-number">4%</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Уровень финансовой нестабильности:</div>
-                <div class="market-card__item-number">48%</div>
-              </li>
-            </ul></a>
-          </li>
-          <li class="markets__item"> <a class="market-card markets__item-card market-card--positive" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
-            <div class="market-card__icon">
-              <svg aria-hidden="true">
-                <use xlink:href="#icon-arrow--link"></use>
-              </svg>
-            </div>
-            <div class="market-card__title">Рынок оборудования для очистки жидкостей<span class="color--gray">2024</span></div>
-            <ul class="market-card__state">
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-brain"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">AI:</div>
-                <div class="market-card__state-item-text">Положительно</div>
-              </li>
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-expert"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">Эксперты:</div>
-                <div class="market-card__state-item-text">Положительно</div>
-              </li>
-            </ul>
-            <ul class="market-card__list">
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем рынка:</div>
-                <div class="market-card__item-number">268 млрд руб. </div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем инвестиций:</div>
-                <div class="market-card__item-number">463 млрд руб.</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Среднерыночная рентабельность:</div>
-                <div class="market-card__item-number">4%</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Уровень финансовой нестабильности:</div>
-                <div class="market-card__item-number">48%</div>
-              </li>
-            </ul></a>
-          </li>
-          <li class="markets__item"> <a class="market-card markets__item-card market-card--positive" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
-            <div class="market-card__icon">
-              <svg aria-hidden="true">
-                <use xlink:href="#icon-arrow--link"></use>
-              </svg>
-            </div>
-            <div class="market-card__title">Рынок оборудования для очистки жидкостей<span class="color--gray">2024</span></div>
-            <ul class="market-card__state">
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-brain"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">AI:</div>
-                <div class="market-card__state-item-text">Положительно</div>
-              </li>
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-expert"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">Эксперты:</div>
-                <div class="market-card__state-item-text">Положительно</div>
-              </li>
-            </ul>
-            <ul class="market-card__list">
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем рынка:</div>
-                <div class="market-card__item-number">268 млрд руб. </div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем инвестиций:</div>
-                <div class="market-card__item-number">463 млрд руб.</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Среднерыночная рентабельность:</div>
-                <div class="market-card__item-number">4%</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Уровень финансовой нестабильности:</div>
-                <div class="market-card__item-number">48%</div>
-              </li>
-            </ul></a>
-          </li>
-          <li class="markets__item"> <a class="market-card markets__item-card market-card--" href="/markets.html" title="Рынок оборудования для очистки жидкостей">
-            <div class="market-card__icon">
-              <svg aria-hidden="true">
-                <use xlink:href="#icon-arrow--link"></use>
-              </svg>
-            </div>
-            <div class="market-card__title">Рынок оборудования для очистки жидкостей<span class="color--gray">2024</span></div>
-            <ul class="market-card__state">
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-brain"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">AI:</div>
-                <div class="market-card__state-item-text">Нейтрально</div>
-              </li>
-              <li class="market-card__state-item">
-                <div class="market-card__state-item-icon">
-                  <svg width="24" height="24" aria-hidden="true">
-                    <use xlink:href="#icon-expert"></use>
-                  </svg>
-                </div>
-                <div class="market-card__state-item-title">Эксперты:</div>
-                <div class="market-card__state-item-text">Нейтрально</div>
-              </li>
-            </ul>
-            <ul class="market-card__list">
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем рынка:</div>
-                <div class="market-card__item-number">268 млрд руб. </div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Объем инвестиций:</div>
-                <div class="market-card__item-number">463 млрд руб.</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Среднерыночная рентабельность:</div>
-                <div class="market-card__item-number">4%</div>
-              </li>
-              <li class="market-card__item">
-                <div class="market-card__item-name">Уровень финансовой нестабильности:</div>
-                <div class="market-card__item-number">48%</div>
-              </li>
-            </ul></a>
-          </li> -->
-        </ul>
-        <div class="pagination pagination--grid markets__pagination">
-          <div class="pagination__info">1-10 of 1,250</div>
-          <div class="pagination__navigation">
-            <button class="pagination__btn pagination__btn--prev" type="button" title="Back page" disabled>
-              <svg width="16" height="16" aria-hidden="true">
-                <use xlink:href="#icon-arrow--select"></use>
-              </svg>Back
-            </button>
-            <ul class="pagination__list">
-              <li class="pagination__list-item"><a class="pagination__list-item-link is-active" href="#!" title="1">1</a></li>
-              <li class="pagination__list-item"><a class="pagination__list-item-link" href="#!" title="2">2</a></li>
-              <li class="pagination__list-item"><a class="pagination__list-item-link" href="#!" title="3">3</a></li>
-              <li class="pagination__list-item"><a class="pagination__list-item-link" href="#!" title="4">4</a></li>
-              <li class="pagination__list-item"><a class="pagination__list-item-link" href="#!" title="5">5</a></li>
-              <li class="pagination__list-item"><a class="pagination__list-item-link" href="#!" title="6-10">...</a></li>
-              <li class="pagination__list-item"><a class="pagination__list-item-link" href="#!" title="123">123</a></li>
-            </ul>
-            <button class="pagination__btn pagination__btn--next" type="button" title="Next page">Next
-              <svg width="16" height="16" aria-hidden="true">
-                <use xlink:href="#icon-arrow--select"></use>
-              </svg>
-            </button>
-          </div>
-          <div class="pagination__select">
-            <div class="pagination__select-text">Result per page</div>
-            <div class="pagination-select">
-              <div class="pagination-select__trigger">
-                <div class="pagination-select__trigger-title">10</div>
-                <div class="pagination-select__trigger-icon">
-                  <svg width="16" height="16" aria-hidden="true">
-                    <use xlink:href="#icon-arrow--select"></use>
-                  </svg>
-                </div>
-              </div>
-              <div class="pagination-select__list">
-                <div class="pagination-select__item visually-hidden">10</div>
-                <div class="pagination-select__item">25</div>
-                <div class="pagination-select__item">50</div>
-                <div class="pagination-select__item">100</div>
-                <div class="pagination-select__item">200</div>
-                <div class="pagination-select__item">500</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <MarketsSection :initial-markets="marketsData" />
     <section class="services" id="services">
       <div class="container services__container">
         <div class="services__pretitle pretitle">Поддержите нашу деятельность приобретением глубокого исследования</div>
