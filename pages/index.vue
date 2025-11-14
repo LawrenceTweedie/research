@@ -1,6 +1,9 @@
 <script setup>
 import CallbackForm from '~/components/CallbackForm.vue'
 import MarketsSection from '~/components/MarketsSection.vue'
+
+// Загружаем данные для SSG через серверный API
+const { data: marketsData } = await useAsyncData('markets-data', () => $fetch('/api/markets'))
 </script>
 
 <template>
@@ -120,7 +123,7 @@ import MarketsSection from '~/components/MarketsSection.vue'
         </ul>
       </div>
     </section>
-    <MarketsSection />
+    <MarketsSection :initial-markets="marketsData || []" />
     <section class="services" id="services">
       <div class="container services__container">
         <div class="services__pretitle pretitle">Поддержите нашу деятельность приобретением глубокого исследования</div>

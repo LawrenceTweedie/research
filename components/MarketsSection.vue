@@ -235,6 +235,22 @@ const formatNumber = (num) => {
 
 // Загрузка данных
 onMounted(async () => {
+  // Если данные уже переданы через props, загружаем только regions и categories
+  if (props.initialMarkets && props.initialMarkets.length > 0) {
+    try {
+      const regionsRes = await fetch('/data/regions.json')
+      const regionsData = await regionsRes.json()
+      regions.value = regionsData.map(([id, name]) => ({ id, name }))
+
+      const uniqueCategories = [...new Set(allMarkets.value.map(m => m.category))]
+      categories.value = uniqueCategories.map(cat => ({ name: cat }))
+    } catch (error) {
+      console.error('Error loading regions:', error)
+    }
+    return
+  }
+
+  // Полная загрузка данных (если initialMarkets не передали)
   try {
     // Загружаем markets.json
     const marketsRes = await fetch('/data/markets.json')
