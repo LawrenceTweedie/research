@@ -2,8 +2,87 @@
 import CallbackForm from '~/components/CallbackForm.vue'
 import MarketsSection from '~/components/MarketsSection.vue'
 
-// Загружаем данные для SSG через серверный API
-const { data: marketsData } = await useAsyncData('markets-data', () => $fetch('/api/markets'))
+// Функция для определения emotion из текста
+const parseEmotion = (emotionText) => {
+  if (!emotionText) return 'neutral'
+  const text = emotionText.toLowerCase()
+  if (text.includes('позитив') || text.includes('положительно')) {
+    return 'positive'
+  } else if (text.includes('негатив') || text.includes('отрицательно')) {
+    return 'negative'
+  }
+  return 'neutral'
+}
+
+// Форматирование чисел
+const formatNumber = (num) => {
+  if (!num && num !== 0) return '0'
+  if (typeof num === 'string' && num.includes(' ')) {
+    return num
+  }
+  if (typeof num === 'string') {
+    num = num.replace(/\s/g, '')
+    num = parseFloat(num)
+  }
+  return new Intl.NumberFormat('ru-RU').format(num)
+}
+
+// Загружаем данные СИНХРОННО при SSG - данные встраиваются прямо в HTML
+// Используем прямой await $fetch вместо useAsyncData чтобы избежать payload
+let marketsData = []
+try {
+  // Загружаем основные данные из публичной директории
+  const marketsRes = await $fetch('/data/markets.json')
+  const searchRes = await $fetch('/data/search.json')
+
+  // Для каждого рынка загружаем данные
+  const marketPromises = Object.entries(marketsRes).map(async ([marketId, marketName]) => {
+    try {
+      const newsData = await $fetch(`/data/${marketId}_news.json`)
+      const regionData = await $fetch(`/data/${marketId}_region.json`)
+
+      // Получаем агрегированные данные по всей России
+      const firstRegion = Object.keys(regionData)[0]
+      const metrics = firstRegion ? regionData[firstRegion] : {}
+
+      // Определяем emotion для AI и экспертов
+      let emotionAI = 'neutral'
+      let emotionExperts = 'neutral'
+
+      if (newsData.emotion_ai || newsData.emotion_experts) {
+        emotionAI = parseEmotion(newsData.emotion_ai)
+        emotionExperts = parseEmotion(newsData.emotion_experts)
+      } else if (newsData.emotion) {
+        const commonEmotion = parseEmotion(newsData.emotion)
+        emotionAI = commonEmotion
+        emotionExperts = commonEmotion
+      }
+
+      return {
+        id: marketId,
+        title: marketName,
+        emotionAI,
+        emotionExperts,
+        marketVolume: metrics['Объем рынка 2024'] ? `${formatNumber(metrics['Объем рынка 2024'])} тыс. руб.` : 'н/д',
+        investmentVolume: metrics['Объем инвестиций в основной капитал 2024'] ? `${formatNumber(metrics['Объем инвестиций в основной капитал 2024'])} тыс. руб.` : 'н/д',
+        profitability: metrics['Рентабельность рынка 2024'] ? `${metrics['Рентабельность рынка 2024']}%` : 'н/д',
+        instability: metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024'] ? `${metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024']}%` : 'н/д',
+        link: `/${marketId}`,
+        category: marketName,
+        regions: searchRes[marketName] || []
+      }
+    } catch (error) {
+      console.error(`Error loading data for market ${marketId}:`, error)
+      return null
+    }
+  })
+
+  const markets = await Promise.all(marketPromises)
+  marketsData = markets.filter(m => m !== null)
+} catch (error) {
+  console.error('Error loading markets data:', error)
+  marketsData = []
+}
 </script>
 
 <template>
@@ -123,7 +202,7 @@ const { data: marketsData } = await useAsyncData('markets-data', () => $fetch('/
         </ul>
       </div>
     </section>
-    <MarketsSection :initial-markets="marketsData || []" />
+    <MarketsSection :initial-markets="marketsData" />
     <section class="services" id="services">
       <div class="container services__container">
         <div class="services__pretitle pretitle">Поддержите нашу деятельность приобретением глубокого исследования</div>
