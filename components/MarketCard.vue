@@ -22,7 +22,7 @@
           </svg>
         </div>
         <div class="market-card__state-item-title">AI:</div>
-        <div class="market-card__state-item-text">{{ emotionText }}</div>
+        <div class="market-card__state-item-text">{{ emotionTextAI }}</div>
       </li>
       <li class="market-card__state-item">
         <div class="market-card__state-item-icon">
@@ -31,7 +31,7 @@
           </svg>
         </div>
         <div class="market-card__state-item-title">Эксперты:</div>
-        <div class="market-card__state-item-text">{{ emotionText }}</div>
+        <div class="market-card__state-item-text">{{ emotionTextExperts }}</div>
       </li>
     </ul>
     <ul class="market-card__list">
@@ -65,17 +65,36 @@ const props = defineProps({
   }
 })
 
-const emotionText = computed(() => {
-  const emotions = {
-    negative: 'Негативно',
-    positive: 'Положительно',
-    neutral: 'Нейтрально'
-  }
-  return emotions[props.market.emotion] || 'Нейтрально'
+const emotions = {
+  negative: 'Негативно',
+  positive: 'Положительно',
+  neutral: 'Нейтрально'
+}
+
+const emotionTextAI = computed(() => {
+  return emotions[props.market.emotionAI] || 'Нейтрально'
 })
 
+const emotionTextExperts = computed(() => {
+  return emotions[props.market.emotionExperts] || 'Нейтрально'
+})
+
+// Класс карточки определяется по наиболее тревожной оценке
+// Приоритет: negative > neutral > positive
 const emotionClass = computed(() => {
-  return props.market.emotion || 'neutral'
+  const ai = props.market.emotionAI || 'neutral'
+  const experts = props.market.emotionExperts || 'neutral'
+
+  // Если хотя бы одна оценка негативная, карточка красная
+  if (ai === 'negative' || experts === 'negative') {
+    return 'negative'
+  }
+  // Если хотя бы одна оценка нейтральная, карточка серая
+  if (ai === 'neutral' || experts === 'neutral') {
+    return 'neutral'
+  }
+  // Обе оценки позитивные - карточка зеленая
+  return 'positive'
 })
 
 const marketLink = computed(() => {

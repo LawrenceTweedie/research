@@ -264,21 +264,39 @@ onMounted(async () => {
         const firstRegion = Object.keys(regionData)[0]
         const metrics = firstRegion ? regionData[firstRegion] : {}
 
-        // Определяем emotion
-        let emotion = 'neutral'
-        if (newsData.emotion) {
-          const emotionText = newsData.emotion.toLowerCase()
-          if (emotionText.includes('позитив') || emotionText.includes('положительно')) {
-            emotion = 'positive'
-          } else if (emotionText.includes('негатив') || emotionText.includes('отрицательно')) {
-            emotion = 'negative'
+        // Функция для определения emotion из текста
+        const parseEmotion = (emotionText) => {
+          if (!emotionText) return 'neutral'
+          const text = emotionText.toLowerCase()
+          if (text.includes('позитив') || text.includes('положительно')) {
+            return 'positive'
+          } else if (text.includes('негатив') || text.includes('отрицательно')) {
+            return 'negative'
           }
+          return 'neutral'
+        }
+
+        // Определяем emotion для AI и экспертов
+        let emotionAI = 'neutral'
+        let emotionExperts = 'neutral'
+
+        // Новая структура: отдельные поля для AI и экспертов
+        if (newsData.emotion_ai || newsData.emotion_experts) {
+          emotionAI = parseEmotion(newsData.emotion_ai)
+          emotionExperts = parseEmotion(newsData.emotion_experts)
+        }
+        // Старая структура: одно поле emotion для обоих
+        else if (newsData.emotion) {
+          const commonEmotion = parseEmotion(newsData.emotion)
+          emotionAI = commonEmotion
+          emotionExperts = commonEmotion
         }
 
         return {
           id: marketId,
           title: marketName,
-          emotion,
+          emotionAI,
+          emotionExperts,
           marketVolume: metrics['Объем рынка 2024'] ? `${formatNumber(metrics['Объем рынка 2024'])} тыс. руб.` : 'н/д',
           investmentVolume: metrics['Объем инвестиций в основной капитал 2024'] ? `${formatNumber(metrics['Объем инвестиций в основной капитал 2024'])} тыс. руб.` : 'н/д',
           profitability: metrics['Рентабельность рынка 2024'] ? `${metrics['Рентабельность рынка 2024']}%` : 'н/д',
@@ -314,7 +332,8 @@ const getSampleMarkets = () => ([
   {
     id: '1',
     title: 'Добыча угля',
-    emotion: 'positive',
+    emotionAI: 'positive',
+    emotionExperts: 'positive',
     marketVolume: '450 млрд руб.',
     investmentVolume: '680 млрд руб.',
     profitability: '12%',
@@ -326,7 +345,8 @@ const getSampleMarkets = () => ([
   {
     id: '2',
     title: 'Рынок акустической аппаратуры',
-    emotion: 'neutral',
+    emotionAI: 'neutral',
+    emotionExperts: 'neutral',
     marketVolume: '180 млрд руб.',
     investmentVolume: '320 млрд руб.',
     profitability: '6%',
@@ -338,7 +358,8 @@ const getSampleMarkets = () => ([
   {
     id: '3',
     title: 'Рынок программного обеспечения',
-    emotion: 'positive',
+    emotionAI: 'positive',
+    emotionExperts: 'positive',
     marketVolume: '890 млрд руб.',
     investmentVolume: '1.2 трлн руб.',
     profitability: '10%',
