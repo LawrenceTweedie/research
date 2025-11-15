@@ -78,15 +78,15 @@ export default defineNuxtConfig({
 
         const routes = ['/']
 
-        // Генерируем маршруты для каждой комбинации market + region
+        // Генерируем маршруты для всех 201 рынков и их регионов
         for (const [marketId, marketName] of Object.entries(marketsData)) {
-          // Добавляем страницу "вся Россия" для рынка
+          // Добавляем страницу "вся Россия" для каждого рынка
           routes.push(`/${marketId}`)
 
-          // Находим регионы для этого рынка
+          // Находим регионы для этого рынка из searchData
           const regionsForMarket = searchData[marketName] || []
 
-          // Для каждого региона создаем маршрут
+          // Для каждого региона создаем маршрут (если есть в regionsData)
           for (const regionName of regionsForMarket) {
             const regionEntry = regionsData.find(([id, name]) => name === regionName)
             if (regionEntry) {
@@ -96,7 +96,7 @@ export default defineNuxtConfig({
           }
         }
 
-        console.log(`📦 Генерация ${routes.length} статических страниц...`)
+        console.log(`📦 Генерация ${routes.length} статических страниц для ${Object.keys(marketsData).length} рынков...`)
 
         // Добавляем маршруты в конфигурацию
         nitroConfig.prerender = nitroConfig.prerender || {}
