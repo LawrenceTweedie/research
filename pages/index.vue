@@ -38,8 +38,23 @@ try {
   // Для каждого рынка загружаем данные
   const marketPromises = Object.entries(marketsRes).map(async ([marketId, marketName]) => {
     try {
-      const newsData = await $fetch(`/data/${marketId}_news.json`)
-      const regionData = await $fetch(`/data/${marketId}_region.json`)
+      let newsData = {}
+      let regionData = {}
+
+      // Пробуем загружать файлы, но не требуем их наличия
+      try {
+        newsData = await $fetch(`/data/${marketId}_news.json`)
+      } catch (err) {
+        // Файл может отсутствовать - это нормально
+        newsData = {}
+      }
+
+      try {
+        regionData = await $fetch(`/data/${marketId}_region.json`)
+      } catch (err) {
+        // Файл может отсутствовать - это нормально
+        regionData = {}
+      }
 
       // Получаем агрегированные данные по всей России
       const firstRegion = Object.keys(regionData)[0]
@@ -73,7 +88,20 @@ try {
       }
     } catch (error) {
       console.error(`Error loading data for market ${marketId}:`, error)
-      return null
+      // Возвращаем рынок с базовой информацией даже при ошибке
+      return {
+        id: marketId,
+        title: marketName,
+        emotionAI: 'neutral',
+        emotionExperts: 'neutral',
+        marketVolume: 'н/д',
+        investmentVolume: 'н/д',
+        profitability: 'н/д',
+        instability: 'н/д',
+        link: `/${marketId}`,
+        category: marketName,
+        regions: searchRes[marketName] || []
+      }
     }
   })
 

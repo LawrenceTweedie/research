@@ -268,17 +268,8 @@ onMounted(async () => {
     // Для каждого рынка загружаем данные
     const marketPromises = Object.entries(marketsData).map(async ([marketId, marketName]) => {
       try {
-        // Загружаем новости для получения эмоции
-        const newsRes = await fetch(`/data/${marketId}_news.json`)
-        const newsData = await newsRes.json()
-
-        // Загружаем данные по регионам для получения метрик
-        const regionRes = await fetch(`/data/${marketId}_region.json`)
-        const regionData = await regionRes.json()
-
-        // Получаем агрегированные данные по всей России
-        const firstRegion = Object.keys(regionData)[0]
-        const metrics = firstRegion ? regionData[firstRegion] : {}
+        let newsData = {}
+        let regionData = {}
 
         // Функция для определения emotion из текста
         const parseEmotion = (emotionText) => {
@@ -291,6 +282,31 @@ onMounted(async () => {
           }
           return 'neutral'
         }
+
+        // Пробуем загружать файлы, но не требуем их наличия
+        try {
+          const newsRes = await fetch(`/data/${marketId}_news.json`)
+          if (newsRes.ok) {
+            newsData = await newsRes.json()
+          }
+        } catch (err) {
+          // Файл может отсутствовать - это нормально
+          newsData = {}
+        }
+
+        try {
+          const regionRes = await fetch(`/data/${marketId}_region.json`)
+          if (regionRes.ok) {
+            regionData = await regionRes.json()
+          }
+        } catch (err) {
+          // Файл может отсутствовать - это нормально
+          regionData = {}
+        }
+
+        // Получаем агрегированные данные по всей России
+        const firstRegion = Object.keys(regionData)[0]
+        const metrics = firstRegion ? regionData[firstRegion] : {}
 
         // Определяем emotion для AI и экспертов
         let emotionAI = 'neutral'
@@ -323,7 +339,20 @@ onMounted(async () => {
         }
       } catch (error) {
         console.error(`Error loading data for market ${marketId}:`, error)
-        return null
+        // Возвращаем рынок с базовой информацией даже при ошибке
+        return {
+          id: marketId,
+          title: marketName,
+          emotionAI: 'neutral',
+          emotionExperts: 'neutral',
+          marketVolume: 'н/д',
+          investmentVolume: 'н/д',
+          profitability: 'н/д',
+          instability: 'н/д',
+          link: `/${marketId}`,
+          category: marketName,
+          regions: searchData[marketName] || []
+        }
       }
     })
 
