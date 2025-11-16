@@ -266,7 +266,7 @@ onMounted(async () => {
     const searchData = await searchRes.json()
 
     // Для каждого рынка загружаем данные
-    const marketPromises = Object.entries(marketsData).map(async ([marketId, marketName]) => {
+    const marketPromises = Object.entries(marketsData).map(async ([marketName, marketId]) => {
       try {
         // Загружаем новости для получения эмоции
         const newsRes = await fetch(`/data/${marketId}_news.json`)

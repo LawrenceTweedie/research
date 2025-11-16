@@ -36,7 +36,7 @@ try {
   const searchRes = await $fetch('/data/search.json')
 
   // Для каждого рынка загружаем данные
-  const marketPromises = Object.entries(marketsRes).map(async ([marketId, marketName]) => {
+  const marketPromises = Object.entries(marketsRes).map(async ([marketName, marketId]) => {
     try {
       const newsData = await $fetch(`/data/${marketId}_news.json`)
       const regionData = await $fetch(`/data/${marketId}_region.json`)

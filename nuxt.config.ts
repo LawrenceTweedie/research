@@ -76,7 +76,7 @@ export default defineNuxtConfig({
         const routes = ['/']
 
         // Генерируем маршруты для каждой комбинации market + region
-        for (const [marketId, marketName] of Object.entries(marketsData)) {
+        for (const [marketName, marketId] of Object.entries(marketsData)) {
           // Добавляем страницу "вся Россия" для рынка
           routes.push(`/${marketId}`)
 
