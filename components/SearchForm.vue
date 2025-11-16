@@ -230,10 +230,8 @@ const selectMarket = (market) => {
   marketSearchQuery.value = market
   isMarketSelectOpen.value = false
 
-  // Находим ID рынка
-  const marketId = Object.keys(marketsIdMapping.value).find(
-    id => marketsIdMapping.value[id] === market
-  )
+  // Находим ID рынка (markets.json имеет формат {"Название": id})
+  const marketId = marketsIdMapping.value[market]
   selectedMarketId.value = marketId || '1'
 
   // Сброс выбранного региона при смене рынка

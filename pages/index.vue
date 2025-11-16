@@ -35,50 +35,59 @@ try {
   const marketsRes = await $fetch('/data/markets.json')
   const searchRes = await $fetch('/data/search.json')
 
-  // Для каждого рынка загружаем данные
-  const marketPromises = Object.entries(marketsRes).map(async ([marketId, marketName]) => {
-    try {
-      const newsData = await $fetch(`/data/${marketId}_news.json`)
-      const regionData = await $fetch(`/data/${marketId}_region.json`)
+  // Валидация загруженных данных
+  if (typeof marketsRes !== 'object' || Array.isArray(marketsRes) || !marketsRes) {
+    console.error('Ошибка: markets.json не является объектом', typeof marketsRes)
+    marketsData = []
+  } else if (typeof searchRes !== 'object' || Array.isArray(searchRes) || !searchRes) {
+    console.error('Ошибка: search.json не является объектом', typeof searchRes)
+    marketsData = []
+  } else {
+    // Для каждого рынка загружаем данные
+    const marketPromises = Object.entries(marketsRes).map(async ([marketName, marketId]) => {
+      try {
+        const newsData = await $fetch(`/data/${marketId}_news.json`)
+        const regionData = await $fetch(`/data/${marketId}_region.json`)
 
-      // Получаем агрегированные данные по всей России
-      const firstRegion = Object.keys(regionData)[0]
-      const metrics = firstRegion ? regionData[firstRegion] : {}
+        // Получаем агрегированные данные по всей России
+        const firstRegion = Object.keys(regionData)[0]
+        const metrics = firstRegion ? regionData[firstRegion] : {}
 
-      // Определяем emotion для AI и экспертов
-      let emotionAI = 'neutral'
-      let emotionExperts = 'neutral'
+        // Определяем emotion для AI и экспертов
+        let emotionAI = 'neutral'
+        let emotionExperts = 'neutral'
 
-      if (newsData.emotion_ai || newsData.emotion_experts) {
-        emotionAI = parseEmotion(newsData.emotion_ai)
-        emotionExperts = parseEmotion(newsData.emotion_experts)
-      } else if (newsData.emotion) {
-        const commonEmotion = parseEmotion(newsData.emotion)
-        emotionAI = commonEmotion
-        emotionExperts = commonEmotion
+        if (newsData.emotion_ai || newsData.emotion_experts) {
+          emotionAI = parseEmotion(newsData.emotion_ai)
+          emotionExperts = parseEmotion(newsData.emotion_experts)
+        } else if (newsData.emotion) {
+          const commonEmotion = parseEmotion(newsData.emotion)
+          emotionAI = commonEmotion
+          emotionExperts = commonEmotion
+        }
+
+        return {
+          id: marketId,
+          title: marketName,
+          emotionAI,
+          emotionExperts,
+          marketVolume: metrics['Объем рынка 2024'] ? `${formatNumber(metrics['Объем рынка 2024'])} тыс. руб.` : 'н/д',
+          investmentVolume: metrics['Объем инвестиций в основной капитал 2024'] ? `${formatNumber(metrics['Объем инвестиций в основной капитал 2024'])} тыс. руб.` : 'н/д',
+          profitability: metrics['Рентабельность рынка 2024'] ? `${metrics['Рентабельность рынка 2024']}%` : 'н/д',
+          instability: metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024'] ? `${metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024']}%` : 'н/д',
+          link: `/${marketId}`,
+          category: marketName,
+          regions: searchRes[marketName] || []
+        }
+      } catch (error) {
+        console.error(`Error loading data for market ${marketId}:`, error)
+        return null
       }
+    })
 
-      return {
-        id: marketId,
-        title: marketName,
-        emotionAI,
-        emotionExperts,
-        marketVolume: metrics['Объем рынка 2024'] ? `${formatNumber(metrics['Объем рынка 2024'])} тыс. руб.` : 'н/д',
-        investmentVolume: metrics['Объем инвестиций в основной капитал 2024'] ? `${formatNumber(metrics['Объем инвестиций в основной капитал 2024'])} тыс. руб.` : 'н/д',
-        profitability: metrics['Рентабельность рынка 2024'] ? `${metrics['Рентабельность рынка 2024']}%` : 'н/д',
-        instability: metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024'] ? `${metrics['Уровень финансовой нестабильности (Индекс Ниши) 2024']}%` : 'н/д',
-        link: `/${marketId}`,
-        category: marketName,
-        regions: searchRes[marketName] || []
-      }
-    } catch (error) {
-      console.error(`Error loading data for market ${marketId}:`, error)
-      return null
-    }
-  })
-
-  const markets = await Promise.all(marketPromises)
-  marketsData = markets.filter(m => m !== null)
+    const markets = await Promise.all(marketPromises)
+    marketsData = markets.filter(m => m !== null)
+  }
 } catch (error) {
   console.error('Error loading markets data:', error)
   marketsData = []

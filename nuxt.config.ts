@@ -75,16 +75,49 @@ export default defineNuxtConfig({
 
         const routes = ['/']
 
+        // Валидация загруженных данных
+        if (typeof marketsData !== 'object' || Array.isArray(marketsData)) {
+          console.error('❌ marketsData должен быть объектом, получен:', typeof marketsData)
+          return
+        }
+
+        if (!Array.isArray(regionsData)) {
+          console.error('❌ regionsData должен быть массивом, получен:', typeof regionsData)
+          return
+        }
+
         // Генерируем маршруты для каждой комбинации market + region
-        for (const [marketId, marketName] of Object.entries(marketsData)) {
+        for (const [marketName, marketId] of Object.entries(marketsData)) {
+          // Валидация данных
+          if (typeof marketName !== 'string' || marketName.length === 0) {
+            console.warn('⚠️ Пропуск некорректного названия рынка:', marketName)
+            continue
+          }
+
+          if (!marketId || (typeof marketId !== 'number' && typeof marketId !== 'string')) {
+            console.warn('⚠️ Пропуск некорректного ID рынка:', marketId, 'для рынка:', marketName)
+            continue
+          }
+
           // Добавляем страницу "вся Россия" для рынка
           routes.push(`/${marketId}`)
 
           // Находим регионы для этого рынка
           const regionsForMarket = searchData[marketName] || []
 
+          // Валидация что это массив
+          if (!Array.isArray(regionsForMarket)) {
+            console.warn('⚠️ regionsForMarket не массив для рынка:', marketName)
+            continue
+          }
+
           // Для каждого региона создаем маршрут
           for (const regionName of regionsForMarket) {
+            if (typeof regionName !== 'string') {
+              console.warn('⚠️ Некорректное название региона:', regionName)
+              continue
+            }
+
             const regionEntry = regionsData.find(([id, name]) => name === regionName)
             if (regionEntry) {
               const regionId = regionEntry[0]

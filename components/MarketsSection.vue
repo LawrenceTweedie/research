@@ -256,17 +256,37 @@ onMounted(async () => {
     const marketsRes = await fetch('/data/markets.json')
     const marketsData = await marketsRes.json()
 
+    // Валидация загруженных данных
+    if (typeof marketsData !== 'object' || Array.isArray(marketsData) || !marketsData) {
+      console.error('Ошибка: markets.json не является объектом в MarketsSection', typeof marketsData)
+      allMarkets.value = getSampleMarkets()
+      return
+    }
+
     // Загружаем regions.json
     const regionsRes = await fetch('/data/regions.json')
     const regionsData = await regionsRes.json()
+
+    if (!Array.isArray(regionsData)) {
+      console.error('Ошибка: regions.json не является массивом в MarketsSection', typeof regionsData)
+      allMarkets.value = getSampleMarkets()
+      return
+    }
+
     regions.value = regionsData.map(([id, name]) => ({ id, name }))
 
     // Загружаем search.json
     const searchRes = await fetch('/data/search.json')
     const searchData = await searchRes.json()
 
+    if (typeof searchData !== 'object' || Array.isArray(searchData) || !searchData) {
+      console.error('Ошибка: search.json не является объектом в MarketsSection', typeof searchData)
+      allMarkets.value = getSampleMarkets()
+      return
+    }
+
     // Для каждого рынка загружаем данные
-    const marketPromises = Object.entries(marketsData).map(async ([marketId, marketName]) => {
+    const marketPromises = Object.entries(marketsData).map(async ([marketName, marketId]) => {
       try {
         // Загружаем новости для получения эмоции
         const newsRes = await fetch(`/data/${marketId}_news.json`)

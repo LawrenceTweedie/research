@@ -385,8 +385,11 @@ onMounted(async () => {
     regionsData.value = await regionsRes.json()
     marketsIdMapping.value = await marketsIdRes.json()
 
-    // Получаем название рынка
-    marketName.value = marketsIdMapping.value[marketId.value] || 'Неизвестный рынок'
+    // Получаем название рынка (инвертируем маппинг: из {"название": id} в {id: "название"})
+    const invertedMapping = Object.fromEntries(
+      Object.entries(marketsIdMapping.value).map(([name, id]) => [id, name])
+    )
+    marketName.value = invertedMapping[marketId.value] || 'Неизвестный рынок'
 
     // Получаем доступные регионы для этого рынка
     const regionNames = searchData.value[marketName.value] || []
