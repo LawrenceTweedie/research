@@ -335,25 +335,25 @@ const router = useRouter()
 const marketId = computed(() => route.params.marketId)
 const regionId = computed(() => route.params.regionId || '')
 
-// Загружаем данные напрямую из JSON файлов
-const { data: marketsData } = await useAsyncData('markets', () => $fetch('/data/markets.json'))
-const { data: regionsData } = await useAsyncData('regions', () => $fetch('/data/regions.json'))
-const { data: searchData } = await useAsyncData('search', () => $fetch('/data/search.json'))
+// Загружаем данные напрямую из JSON файлов с уникальными ключами
+const { data: marketsData } = await useAsyncData(`markets-${marketId.value}-${regionId.value}`, () => $fetch('/data/markets.json'))
+const { data: regionsData } = await useAsyncData(`regions-${marketId.value}-${regionId.value}`, () => $fetch('/data/regions.json'))
+const { data: searchData } = await useAsyncData(`search-${marketId.value}-${regionId.value}`, () => $fetch('/data/search.json'))
 
 // Загружаем данные конкретного рынка
-const { data: activitiesData } = await useAsyncData(`activities-${marketId.value}`, () =>
+const { data: activitiesData } = await useAsyncData(`activities-${marketId.value}-${regionId.value}`, () =>
   $fetch(`/data/${marketId.value}_okv.json`).catch(() => [])
 )
 
-const { data: newsData } = await useAsyncData(`news-${marketId.value}`, () =>
+const { data: newsData } = await useAsyncData(`news-${marketId.value}-${regionId.value}`, () =>
   $fetch(`/data/${marketId.value}_news.json`).catch(() => ({}))
 )
 
-const { data: regionDataAll } = await useAsyncData(`region-data-${marketId.value}`, () =>
+const { data: regionDataAll } = await useAsyncData(`region-data-${marketId.value}-${regionId.value}`, () =>
   $fetch(`/data/${marketId.value}_region.json`).catch(() => ({}))
 )
 
-const { data: regionsTop10Data } = await useAsyncData(`regions-top10-${marketId.value}`, () =>
+const { data: regionsTop10Data } = await useAsyncData(`regions-top10-${marketId.value}-${regionId.value}`, () =>
   $fetch(`/data/${marketId.value}_regions_top10.json`).catch(() => ({}))
 )
 

@@ -334,10 +334,10 @@ const router = useRouter()
 
 const marketId = computed(() => route.params.marketId)
 
-// Загружаем данные напрямую из JSON файлов
-const { data: marketsData } = await useAsyncData('markets', () => $fetch('/data/markets.json'))
-const { data: regionsData } = await useAsyncData('regions', () => $fetch('/data/regions.json'))
-const { data: searchData } = await useAsyncData('search', () => $fetch('/data/search.json'))
+// Загружаем данные напрямую из JSON файлов с уникальными ключами
+const { data: marketsData } = await useAsyncData(`markets-${marketId.value}`, () => $fetch('/data/markets.json'))
+const { data: regionsData } = await useAsyncData(`regions-${marketId.value}`, () => $fetch('/data/regions.json'))
+const { data: searchData } = await useAsyncData(`search-${marketId.value}`, () => $fetch('/data/search.json'))
 
 // Загружаем данные конкретного рынка
 const { data: activitiesData } = await useAsyncData(`activities-${marketId.value}`, () =>
