@@ -86,6 +86,11 @@ export default defineNuxtConfig({
           return
         }
 
+        // Определяем режим генерации:
+        // - FULL_PRERENDER=true - генерировать все страницы (~10,679) [для production с большой памятью]
+        // - по умолчанию - только основные страницы (~200) [для локальной разработки]
+        const fullPrerender = process.env.FULL_PRERENDER === 'true'
+
         // Генерируем маршруты для каждой комбинации market + region
         for (const [marketName, marketId] of Object.entries(marketsData)) {
           // Валидация данных
@@ -102,28 +107,38 @@ export default defineNuxtConfig({
           // Добавляем страницу "вся Россия" для рынка
           routes.push(`/${marketId}`)
 
-          // Находим регионы для этого рынка
-          const regionsForMarket = searchData[marketName] || []
+          // Региональные страницы генерируем только если FULL_PRERENDER=true
+          if (fullPrerender) {
+            // Находим регионы для этого рынка
+            const regionsForMarket = searchData[marketName] || []
 
-          // Валидация что это массив
-          if (!Array.isArray(regionsForMarket)) {
-            console.warn('⚠️ regionsForMarket не массив для рынка:', marketName)
-            continue
-          }
-
-          // Для каждого региона создаем маршрут
-          for (const regionName of regionsForMarket) {
-            if (typeof regionName !== 'string') {
-              console.warn('⚠️ Некорректное название региона:', regionName)
+            // Валидация что это массив
+            if (!Array.isArray(regionsForMarket)) {
+              console.warn('⚠️ regionsForMarket не массив для рынка:', marketName)
               continue
             }
 
-            const regionEntry = regionsData.find(([id, name]) => name === regionName)
-            if (regionEntry) {
-              const regionId = regionEntry[0]
-              routes.push(`/${marketId}/${regionId}`)
+            // Для каждого региона создаем маршрут
+            for (const regionName of regionsForMarket) {
+              if (typeof regionName !== 'string') {
+                console.warn('⚠️ Некорректное название региона:', regionName)
+                continue
+              }
+
+              const regionEntry = regionsData.find(([id, name]) => name === regionName)
+              if (regionEntry) {
+                const regionId = regionEntry[0]
+                routes.push(`/${marketId}/${regionId}`)
+              }
             }
           }
+        }
+
+        if (fullPrerender) {
+          console.log('🔥 Режим полной генерации: все страницы включая региональные')
+        } else {
+          console.log('⚡ Режим быстрой генерации: только основные страницы (без регионов)')
+          console.log('💡 Для полной генерации используйте: FULL_PRERENDER=true npm run generate')
         }
 
         console.log(`📦 Генерация ${routes.length} статических страниц...`)
