@@ -3,7 +3,7 @@
   <section class="market-info">
     <div class="container market-info__container">
       <div class="market-info__header">
-        <h2 class="market-info__title title">{{ marketName }}</h2>
+        <h2 class="market-info__title title">{{ marketData?.marketName || 'Загрузка...' }}</h2>
         <div class="market-info__description">
           {{ descriptionShort }}
           <button
@@ -326,23 +326,56 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
 
 const marketId = computed(() => route.params.marketId)
-const regionId = ref('')
 
-const searchData = ref({})
-const regionsData = ref([])
-const marketsIdMapping = ref({})
-const marketName = ref('Загрузка...')
-const regionName = ref('Вся Россия')
-const selectedRegionId = ref('')
-const selectedRegionName = ref('Вся Россия')
-const availableRegions = ref([])
+// Загружаем данные через useAsyncData для SSG
+const { data: response } = await useAsyncData(
+  `market-${marketId.value}`,
+  () => $fetch(`/api/market/${marketId.value}`)
+)
+
+const marketData = computed(() => response.value?.data || {})
+const activities = computed(() => marketData.value.activities || [])
+const news = computed(() => marketData.value.news || [])
+const newsEmotion = computed(() => marketData.value.newsEmotion || 'нейтрально')
+const companies = computed(() => marketData.value.companies || [])
+const metrics = computed(() => marketData.value.metrics || {})
+const availableRegions = computed(() => marketData.value.availableRegions || [])
+
+// SEO метатеги
+const marketName = computed(() => marketData.value.marketName || 'Рынок')
+const marketVolume = computed(() => {
+  const volume = metrics.value['Объем рынка 2024']
+  return volume ? `${formatNumber(volume)} тыс. руб.` : 'н/д'
+})
+const profitability = computed(() => {
+  const profit = metrics.value['Рентабельность рынка 2024']
+  return profit ? `${profit}%` : 'н/д'
+})
+
+useHead({
+  title: `${marketName.value} - Анализ рынка России | INRESEARCH`,
+  meta: [
+    {
+      name: 'description',
+      content: `Полный анализ рынка "${marketName.value}" в России. Объем рынка: ${marketVolume.value}, рентабельность: ${profitability.value}. Топ-10 компаний, финансовые показатели за 2020-2024 годы.`
+    },
+    {
+      name: 'keywords',
+      content: `${marketName.value}, анализ рынка России, объем рынка, рентабельность, топ компании, финансовые показатели`
+    },
+    { property: 'og:title', content: `${marketName.value} - Анализ рынка России` },
+    { property: 'og:description', content: `Объем рынка: ${marketVolume.value}, рентабельность: ${profitability.value}. Топ-10 компаний и финансовые показатели.` },
+    { property: 'og:type', content: 'website' },
+    { name: 'robots', content: 'index, follow' }
+  ]
+})
 
 // UI состояния
 const selectOpen = ref(false)
@@ -350,14 +383,11 @@ const indicatorSelectOpen = ref(false)
 const selectedIndicator = ref('')
 const selectedIndicatorName = ref('Все показатели')
 const descriptionExpanded = ref(false)
+const selectedRegionId = ref('')
+const selectedRegionName = ref('Вся Россия')
 
 // Данные
 const marketDescription = ref('Этот рынок представляет собой важный сегмент российской экономики, характеризующийся стабильным ростом и развитием. На протяжении последних лет наблюдается положительная динамика ключевых показателей.')
-const activities = ref([])
-const news = ref([])
-const newsEmotion = ref('')
-const companies = ref([])
-const metrics = ref({})
 
 // Computed для описания
 const descriptionShort = computed(() => {
@@ -371,94 +401,11 @@ const descriptionRest = computed(() => {
   return marketDescription.value.substring(200)
 })
 
-// Загрузка данных
-onMounted(async () => {
-  try {
-    // Загружаем основные данные
-    const [searchRes, regionsRes, marketsIdRes] = await Promise.all([
-      fetch('/data/search.json'),
-      fetch('/data/regions.json'),
-      fetch('/data/markets.json')
-    ])
-
-    searchData.value = await searchRes.json()
-    regionsData.value = await regionsRes.json()
-    marketsIdMapping.value = await marketsIdRes.json()
-
-    // Получаем название рынка (инвертируем маппинг: из {"название": id} в {id: "название"})
-    const invertedMapping = Object.fromEntries(
-      Object.entries(marketsIdMapping.value).map(([name, id]) => [id, name])
-    )
-    marketName.value = invertedMapping[marketId.value] || 'Неизвестный рынок'
-
-    // Получаем доступные регионы для этого рынка
-    const regionNames = searchData.value[marketName.value] || []
-    availableRegions.value = regionsData.value.filter(r => regionNames.includes(r[1]))
-
-    // Загружаем данные рынка
-    await loadMarketData()
-  } catch (error) {
-    console.error('Ошибка загрузки данных:', error)
-  }
-})
-
-// Загрузка данных рынка
-const loadMarketData = async () => {
-  const mid = marketId.value
-
-  try {
-    // Виды деятельности
-    const okvRes = await fetch(`/data/${mid}_okv.json`)
-    if (okvRes.ok) {
-      activities.value = await okvRes.json()
-    }
-
-    // Новости
-    const newsRes = await fetch(`/data/${mid}_news.json`)
-    if (newsRes.ok) {
-      const newsData = await newsRes.json()
-      const newsArray = []
-      let i = 1
-      while (newsData[`header ${i}`]) {
-        newsArray.push({
-          title: newsData[`header ${i}`],
-          link: newsData[`link ${i}`]
-        })
-        i++
-      }
-      news.value = newsArray
-      newsEmotion.value = newsData.emotion || 'нейтрально'
-    }
-
-    // Компании (для всей России)
-    const top10Res = await fetch(`/data/${mid}_top10.json`)
-    if (top10Res.ok) {
-      companies.value = await top10Res.json()
-    }
-
-    // Метрики (для всей России)
-    const metricsRes = await fetch(`/data/${mid}_metrics.json`)
-    if (metricsRes.ok) {
-      metrics.value = await metricsRes.json()
-    }
-  } catch (error) {
-    console.error('Ошибка загрузки данных рынка:', error)
-  }
-}
-
 // Класс эмоции для стилизации
 const emotionClass = computed(() => {
   const emotion = newsEmotion.value.toLowerCase()
   if (emotion.includes('положительно') || emotion.includes('positive')) return 'positive'
   if (emotion.includes('отрицательно') || emotion.includes('negative')) return 'negative'
-  return 'neutral'
-})
-
-// Иконка эмоции
-const emotionIcon = computed(() => {
-  const emotion = newsEmotion.value.toLowerCase()
-  if (emotion.includes('положительно') || emotion.includes('positive')) return 'smile'
-  if (emotion.includes('отрицательно') || emotion.includes('negative')) return 'sad'
   return 'neutral'
 })
 

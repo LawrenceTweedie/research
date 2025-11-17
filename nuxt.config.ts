@@ -50,9 +50,33 @@ export default defineNuxtConfig({
     },
     prerender: {
       // Включаем автоматическое сканирование ссылок
-      crawlLinks: true,
+      crawlLinks: false, // Отключаем, так как мы генерируем все маршруты явно
+      // Увеличиваем параллелизм для быстрой генерации
+      concurrency: 50, // Генерируем до 50 страниц одновременно
       // Маршруты будут добавлены через хук ниже
-      routes: ['/']
+      routes: ['/'],
+      // Retry для неудачных запросов
+      retry: 3,
+      retryDelay: 1000
+    },
+    // Оптимизация для быстрой генерации
+    compressPublicAssets: {
+      gzip: true,
+      brotli: true
+    },
+    minify: true
+  },
+
+  // Оптимизация рендеринга
+  experimental: {
+    payloadExtraction: true, // Извлекаем payload в отдельные файлы для уменьшения HTML
+    renderJsonPayloads: true
+  },
+
+  // Оптимизация роутинга
+  router: {
+    options: {
+      strict: true
     }
   },
 
@@ -60,6 +84,9 @@ export default defineNuxtConfig({
   hooks: {
     'nitro:config'(nitroConfig) {
       try {
+        console.log('🚀 Начало генерации маршрутов для SSG...')
+        const startTime = Date.now()
+
         // Читаем данные из JSON файлов
         const publicDir = path.resolve(__dirname, 'public/data')
 
@@ -74,6 +101,8 @@ export default defineNuxtConfig({
         )
 
         const routes = ['/']
+        let marketCount = 0
+        let regionalCount = 0
 
         // Валидация загруженных данных
         if (typeof marketsData !== 'object' || Array.isArray(marketsData)) {
@@ -101,6 +130,7 @@ export default defineNuxtConfig({
 
           // Добавляем страницу "вся Россия" для рынка
           routes.push(`/${marketId}`)
+          marketCount++
 
           // Находим регионы для этого рынка
           const regionsForMarket = searchData[marketName] || []
@@ -122,11 +152,19 @@ export default defineNuxtConfig({
             if (regionEntry) {
               const regionId = regionEntry[0]
               routes.push(`/${marketId}/${regionId}`)
+              regionalCount++
             }
           }
         }
 
-        console.log(`📦 Генерация ${routes.length} статических страниц...`)
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
+        console.log(`✅ Маршруты сгенерированы за ${elapsed}s`)
+        console.log(`📊 Статистика:`)
+        console.log(`   - Главная страница: 1`)
+        console.log(`   - Страницы рынков (Россия): ${marketCount}`)
+        console.log(`   - Региональные страницы: ${regionalCount}`)
+        console.log(`   - Всего страниц: ${routes.length}`)
+        console.log(`📦 Начало SSG генерации с concurrency=${nitroConfig.prerender?.concurrency || 1}...`)
 
         // Добавляем маршруты в конфигурацию
         nitroConfig.prerender = nitroConfig.prerender || {}
