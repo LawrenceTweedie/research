@@ -1,3 +1,5 @@
+import { getMarketsData, getRegionsData, getSearchData, getMarketFile } from '~/server/utils/marketData'
+
 export default defineEventHandler((event) => {
   const marketId = getRouterParam(event, 'id')
   const regionId = getRouterParam(event, 'regionId')
