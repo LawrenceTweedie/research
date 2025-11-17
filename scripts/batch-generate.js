@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Настройки
-const BATCH_SIZE = 500 // Генерировать по 500 страниц за раз
+const BATCH_SIZE = 100 // Генерировать по 100 страниц за раз (оптимально для памяти)
 const OUTPUT_DIR = path.resolve(__dirname, '../.output')
 const FINAL_OUTPUT = path.resolve(__dirname, '../.output-final')
 
@@ -106,7 +106,7 @@ for (let i = 0; i < batches.length; i++) {
     const startTime = Date.now()
 
     execSync(
-      `node --max-old-space-size=8192 ./node_modules/nuxt/bin/nuxt.mjs generate`,
+      `node --max-old-space-size=16384 --expose-gc ./node_modules/nuxt/bin/nuxt.mjs generate`,
       {
         stdio: 'inherit',
         cwd: path.resolve(__dirname, '..'),
@@ -129,10 +129,15 @@ for (let i = 0; i < batches.length; i++) {
     copyDirRecursive(publicOutput, finalPublic)
     console.log('✓ Результаты скопированы')
 
-    // Небольшая пауза между батчами для очистки памяти
+    // Пауза между батчами для очистки памяти
     if (i < batches.length - 1) {
-      console.log('⏳ Пауза 2 секунды для очистки памяти...')
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      console.log('⏳ Пауза 5 секунд для полной очистки памяти...')
+      // Явно вызываем сборку мусора если доступно
+      if (global.gc) {
+        console.log('🧹 Запуск принудительной сборки мусора...')
+        global.gc()
+      }
+      await new Promise(resolve => setTimeout(resolve, 5000))
     }
 
   } catch (error) {
