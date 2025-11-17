@@ -3,7 +3,7 @@
   <section class="market-info">
     <div class="container market-info__container">
       <div class="market-info__header">
-        <h2 class="market-info__title title">{{ marketData?.marketName || 'Загрузка...' }}</h2>
+        <h2 class="market-info__title title">{{ marketName }}</h2>
         <div class="market-info__description">
           {{ descriptionShort }}
           <button
@@ -334,26 +334,71 @@ const router = useRouter()
 
 const marketId = computed(() => route.params.marketId)
 
-// Загружаем данные через useAsyncData для SSG
-const { data: response } = await useAsyncData(
-  `market-${marketId.value}`,
-  () => $fetch(`/api/market/${marketId.value}`)
+// Загружаем данные напрямую из JSON файлов
+const { data: marketsData } = await useAsyncData('markets', () => $fetch('/data/markets.json'))
+const { data: regionsData } = await useAsyncData('regions', () => $fetch('/data/regions.json'))
+const { data: searchData } = await useAsyncData('search', () => $fetch('/data/search.json'))
+
+// Загружаем данные конкретного рынка
+const { data: activitiesData } = await useAsyncData(`activities-${marketId.value}`, () =>
+  $fetch(`/data/${marketId.value}_okv.json`).catch(() => [])
 )
 
-const marketData = computed(() => response.value?.data || {})
-const activities = computed(() => marketData.value.activities || [])
-const news = computed(() => marketData.value.news || [])
-const newsEmotion = computed(() => marketData.value.newsEmotion || 'нейтрально')
-const companies = computed(() => marketData.value.companies || [])
-const metrics = computed(() => marketData.value.metrics || {})
-const availableRegions = computed(() => marketData.value.availableRegions || [])
+const { data: newsData } = await useAsyncData(`news-${marketId.value}`, () =>
+  $fetch(`/data/${marketId.value}_news.json`).catch(() => ({}))
+)
+
+const { data: companiesData } = await useAsyncData(`companies-${marketId.value}`, () =>
+  $fetch(`/data/${marketId.value}_top10.json`).catch(() => [])
+)
+
+const { data: metricsData } = await useAsyncData(`metrics-${marketId.value}`, () =>
+  $fetch(`/data/${marketId.value}_metrics.json`).catch(() => ({}))
+)
+
+// Обработка данных
+const marketName = computed(() => {
+  if (!marketsData.value) return 'Загрузка...'
+  const invertedMapping = Object.fromEntries(
+    Object.entries(marketsData.value).map(([name, id]) => [id, name])
+  )
+  return invertedMapping[marketId.value] || 'Неизвестный рынок'
+})
+
+const activities = computed(() => activitiesData.value || [])
+const companies = computed(() => companiesData.value || [])
+const metrics = computed(() => metricsData.value || {})
+
+// Обработка новостей
+const news = computed(() => {
+  if (!newsData.value) return []
+  const newsArray = []
+  let i = 1
+  while (newsData.value[`header ${i}`]) {
+    newsArray.push({
+      title: newsData.value[`header ${i}`],
+      link: newsData.value[`link ${i}`]
+    })
+    i++
+  }
+  return newsArray
+})
+
+const newsEmotion = computed(() => newsData.value?.emotion || 'нейтрально')
+
+// Доступные регионы для этого рынка
+const availableRegions = computed(() => {
+  if (!searchData.value || !regionsData.value || !marketName.value) return []
+  const regionNames = searchData.value[marketName.value] || []
+  return regionsData.value.filter(r => regionNames.includes(r[1]))
+})
 
 // SEO метатеги
-const marketName = computed(() => marketData.value.marketName || 'Рынок')
 const marketVolume = computed(() => {
   const volume = metrics.value['Объем рынка 2024']
   return volume ? `${formatNumber(volume)} тыс. руб.` : 'н/д'
 })
+
 const profitability = computed(() => {
   const profit = metrics.value['Рентабельность рынка 2024']
   return profit ? `${profit}%` : 'н/д'
@@ -411,7 +456,6 @@ const emotionClass = computed(() => {
 
 // Форматирование метрик
 const metricsFormatted = computed(() => {
-  const formatted = {}
   const metricsByName = {}
 
   // Группируем метрики по названиям
