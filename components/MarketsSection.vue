@@ -203,6 +203,7 @@ const props = defineProps({
 // Состояния для данных
 const allMarkets = ref(props.initialMarkets)
 const regions = ref([])
+const regionsLoaded = ref(false) // Флаг для ленивой загрузки регионов
 const categories = ref([])
 
 // Состояния для фильтров
@@ -233,20 +234,27 @@ const formatNumber = (num) => {
   return new Intl.NumberFormat('ru-RU').format(num)
 }
 
+// Ленивая загрузка регионов (только при открытии фильтра)
+const loadRegions = async () => {
+  if (regionsLoaded.value) return // Уже загружено
+
+  try {
+    const regionsRes = await fetch('/data/regions.json')
+    const regionsData = await regionsRes.json()
+    regions.value = regionsData.map(([id, name]) => ({ id, name }))
+    regionsLoaded.value = true
+  } catch (error) {
+    console.error('Error loading regions:', error)
+  }
+}
+
 // Загрузка данных
 onMounted(async () => {
-  // Если данные уже переданы через props, загружаем только regions и categories
+  // Если данные уже переданы через props, загружаем только categories
+  // Регионы будут загружены ленивo при клике на фильтр
   if (props.initialMarkets && props.initialMarkets.length > 0) {
-    try {
-      const regionsRes = await fetch('/data/regions.json')
-      const regionsData = await regionsRes.json()
-      regions.value = regionsData.map(([id, name]) => ({ id, name }))
-
-      const uniqueCategories = [...new Set(allMarkets.value.map(m => m.category))]
-      categories.value = uniqueCategories.map(cat => ({ name: cat }))
-    } catch (error) {
-      console.error('Error loading regions:', error)
-    }
+    const uniqueCategories = [...new Set(allMarkets.value.map(m => m.category))]
+    categories.value = uniqueCategories.map(cat => ({ name: cat }))
     return
   }
 
@@ -493,9 +501,13 @@ const paginationInfo = computed(() => {
 })
 
 // Функции управления dropdown
-const toggleRegionSelect = () => {
+const toggleRegionSelect = async () => {
   regionSelectOpen.value = !regionSelectOpen.value
-  if (regionSelectOpen.value) categorySelectOpen.value = false
+  if (regionSelectOpen.value) {
+    categorySelectOpen.value = false
+    // Ленивая загрузка регионов при первом открытии
+    await loadRegions()
+  }
 }
 
 const toggleCategorySelect = () => {
