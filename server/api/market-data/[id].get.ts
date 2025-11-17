@@ -1,4 +1,17 @@
-import { getMarketsData, getRegionsData, getSearchData, getMarketFile } from '../../utils/marketData'
+import fs from 'fs'
+import path from 'path'
+
+// Кэш для общих файлов
+const cache = new Map<string, any>()
+
+function getMarketFile(marketId: string, type: string) {
+  try {
+    const filePath = path.resolve(process.cwd(), `public/data/${marketId}_${type}.json`)
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+  } catch {
+    return type === 'okv' || type === 'top10' ? [] : {}
+  }
+}
 
 export default defineEventHandler((event) => {
   const marketId = getRouterParam(event, 'id')
@@ -7,9 +20,23 @@ export default defineEventHandler((event) => {
     throw createError({ statusCode: 400, message: 'Market ID required' })
   }
 
-  const marketsData = getMarketsData()
-  const regionsData = getRegionsData()
-  const searchData = getSearchData()
+  // Загружаем общие данные с кэшированием
+  if (!cache.has('markets')) {
+    const filePath = path.resolve(process.cwd(), 'public/data/markets.json')
+    cache.set('markets', JSON.parse(fs.readFileSync(filePath, 'utf-8')))
+  }
+  if (!cache.has('regions')) {
+    const filePath = path.resolve(process.cwd(), 'public/data/regions.json')
+    cache.set('regions', JSON.parse(fs.readFileSync(filePath, 'utf-8')))
+  }
+  if (!cache.has('search')) {
+    const filePath = path.resolve(process.cwd(), 'public/data/search.json')
+    cache.set('search', JSON.parse(fs.readFileSync(filePath, 'utf-8')))
+  }
+
+  const marketsData = cache.get('markets')
+  const regionsData = cache.get('regions')
+  const searchData = cache.get('search')
 
   const activities = getMarketFile(marketId, 'okv')
   const newsData = getMarketFile(marketId, 'news')
