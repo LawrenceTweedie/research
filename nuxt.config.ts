@@ -52,7 +52,12 @@ export default defineNuxtConfig({
       // Включаем автоматическое сканирование ссылок
       crawlLinks: true,
       // Маршруты будут добавлены через хук ниже
-      routes: ['/']
+      routes: ['/'],
+      // Ограничиваем количество одновременно рендерящихся страниц
+      // Это снижает потребление памяти
+      concurrency: 10, // Рендерить максимум 10 страниц одновременно (по умолчанию ~25)
+      // Интервал между батчами для сборки мусора
+      interval: 100 // 100мс пауза между страницами для GC
     }
   },
 
@@ -60,88 +65,98 @@ export default defineNuxtConfig({
   hooks: {
     'nitro:config'(nitroConfig) {
       try {
-        // Читаем данные из JSON файлов
-        const publicDir = path.resolve(__dirname, 'public/data')
+        let routes = ['/']
 
-        const searchData = JSON.parse(
-          fs.readFileSync(path.join(publicDir, 'search.json'), 'utf-8')
-        )
-        const regionsData = JSON.parse(
-          fs.readFileSync(path.join(publicDir, 'regions.json'), 'utf-8')
-        )
-        const marketsData = JSON.parse(
-          fs.readFileSync(path.join(publicDir, 'markets.json'), 'utf-8')
-        )
+        // Проверяем режим батчевой генерации
+        if (process.env.BATCH_MODE === 'true' && process.env.BATCH_FILE) {
+          // Читаем маршруты из файла батча
+          const batchRoutes = JSON.parse(
+            fs.readFileSync(process.env.BATCH_FILE, 'utf-8')
+          )
+          routes = batchRoutes
+          console.log(`📦 Батчевая генерация: ${routes.length} страниц в текущем батче`)
+        } else {
+          // Обычная генерация - читаем данные и генерируем маршруты
+          const publicDir = path.resolve(__dirname, 'public/data')
 
-        const routes = ['/']
+          const searchData = JSON.parse(
+            fs.readFileSync(path.join(publicDir, 'search.json'), 'utf-8')
+          )
+          const regionsData = JSON.parse(
+            fs.readFileSync(path.join(publicDir, 'regions.json'), 'utf-8')
+          )
+          const marketsData = JSON.parse(
+            fs.readFileSync(path.join(publicDir, 'markets.json'), 'utf-8')
+          )
 
-        // Валидация загруженных данных
-        if (typeof marketsData !== 'object' || Array.isArray(marketsData)) {
-          console.error('❌ marketsData должен быть объектом, получен:', typeof marketsData)
-          return
-        }
-
-        if (!Array.isArray(regionsData)) {
-          console.error('❌ regionsData должен быть массивом, получен:', typeof regionsData)
-          return
-        }
-
-        // Определяем режим генерации:
-        // - FULL_PRERENDER=true - генерировать все страницы (~10,679) [для production с большой памятью]
-        // - по умолчанию - только основные страницы (~200) [для локальной разработки]
-        const fullPrerender = process.env.FULL_PRERENDER === 'true'
-
-        // Генерируем маршруты для каждой комбинации market + region
-        for (const [marketName, marketId] of Object.entries(marketsData)) {
-          // Валидация данных
-          if (typeof marketName !== 'string' || marketName.length === 0) {
-            console.warn('⚠️ Пропуск некорректного названия рынка:', marketName)
-            continue
+          // Валидация загруженных данных
+          if (typeof marketsData !== 'object' || Array.isArray(marketsData)) {
+            console.error('❌ marketsData должен быть объектом, получен:', typeof marketsData)
+            return
           }
 
-          if (!marketId || (typeof marketId !== 'number' && typeof marketId !== 'string')) {
-            console.warn('⚠️ Пропуск некорректного ID рынка:', marketId, 'для рынка:', marketName)
-            continue
+          if (!Array.isArray(regionsData)) {
+            console.error('❌ regionsData должен быть массивом, получен:', typeof regionsData)
+            return
           }
 
-          // Добавляем страницу "вся Россия" для рынка
-          routes.push(`/${marketId}`)
+          // Определяем режим генерации:
+          // - FULL_PRERENDER=true - генерировать все страницы (~10,679)
+          // - по умолчанию - только основные страницы (~200)
+          const fullPrerender = process.env.FULL_PRERENDER === 'true'
 
-          // Региональные страницы генерируем только если FULL_PRERENDER=true
-          if (fullPrerender) {
-            // Находим регионы для этого рынка
-            const regionsForMarket = searchData[marketName] || []
-
-            // Валидация что это массив
-            if (!Array.isArray(regionsForMarket)) {
-              console.warn('⚠️ regionsForMarket не массив для рынка:', marketName)
+          // Генерируем маршруты для каждой комбинации market + region
+          for (const [marketName, marketId] of Object.entries(marketsData)) {
+            // Валидация данных
+            if (typeof marketName !== 'string' || marketName.length === 0) {
+              console.warn('⚠️ Пропуск некорректного названия рынка:', marketName)
               continue
             }
 
-            // Для каждого региона создаем маршрут
-            for (const regionName of regionsForMarket) {
-              if (typeof regionName !== 'string') {
-                console.warn('⚠️ Некорректное название региона:', regionName)
+            if (!marketId || (typeof marketId !== 'number' && typeof marketId !== 'string')) {
+              console.warn('⚠️ Пропуск некорректного ID рынка:', marketId, 'для рынка:', marketName)
+              continue
+            }
+
+            // Добавляем страницу "вся Россия" для рынка
+            routes.push(`/${marketId}`)
+
+            // Региональные страницы генерируем только если FULL_PRERENDER=true
+            if (fullPrerender) {
+              // Находим регионы для этого рынка
+              const regionsForMarket = searchData[marketName] || []
+
+              // Валидация что это массив
+              if (!Array.isArray(regionsForMarket)) {
+                console.warn('⚠️ regionsForMarket не массив для рынка:', marketName)
                 continue
               }
 
-              const regionEntry = regionsData.find(([id, name]) => name === regionName)
-              if (regionEntry) {
-                const regionId = regionEntry[0]
-                routes.push(`/${marketId}/${regionId}`)
+              // Для каждого региона создаем маршрут
+              for (const regionName of regionsForMarket) {
+                if (typeof regionName !== 'string') {
+                  console.warn('⚠️ Некорректное название региона:', regionName)
+                  continue
+                }
+
+                const regionEntry = regionsData.find(([id, name]) => name === regionName)
+                if (regionEntry) {
+                  const regionId = regionEntry[0]
+                  routes.push(`/${marketId}/${regionId}`)
+                }
               }
             }
           }
-        }
 
-        if (fullPrerender) {
-          console.log('🔥 Режим полной генерации: все страницы включая региональные')
-        } else {
-          console.log('⚡ Режим быстрой генерации: только основные страницы (без регионов)')
-          console.log('💡 Для полной генерации используйте: FULL_PRERENDER=true npm run generate')
-        }
+          if (fullPrerender) {
+            console.log('🔥 Режим полной генерации: все страницы включая региональные')
+          } else {
+            console.log('⚡ Режим быстрой генерации: только основные страницы (без регионов)')
+            console.log('💡 Для полной генерации используйте: npm run generate:full')
+          }
 
-        console.log(`📦 Генерация ${routes.length} статических страниц...`)
+          console.log(`📦 Генерация ${routes.length} статических страниц...`)
+        }
 
         // Добавляем маршруты в конфигурацию
         nitroConfig.prerender = nitroConfig.prerender || {}

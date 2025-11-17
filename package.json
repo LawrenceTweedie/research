@@ -9,6 +9,8 @@
     "dev": "nuxt dev",
     "pregenerate": "npm run prepare-data",
     "generate": "node --max-old-space-size=8192 ./node_modules/nuxt/bin/nuxt.mjs generate",
+    "pregenerate:full": "npm run prepare-data",
+    "generate:full": "node scripts/batch-generate.js",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
   },
