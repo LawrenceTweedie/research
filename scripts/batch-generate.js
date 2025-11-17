@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 // Настройки
-const BATCH_SIZE = 100 // Генерировать по 100 страниц за раз (оптимально для памяти)
+const BATCH_SIZE = 50 // Генерировать по 50 страниц за раз (минимальное потребление памяти)
 const OUTPUT_DIR = path.resolve(__dirname, '../.output')
 const FINAL_OUTPUT = path.resolve(__dirname, '../.output-final')
 

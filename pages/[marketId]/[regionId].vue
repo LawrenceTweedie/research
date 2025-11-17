@@ -360,10 +360,11 @@ let metrics = {}
 const marketDescription = ref('Этот рынок представляет собой важный сегмент российской экономики, характеризующийся стабильным ростом и развитием. На протяжении последних лет наблюдается положительная динамика ключевых показателей.')
 
 try {
-  // Загружаем основные данные
-  searchData = await $fetch('/data/search.json')
-  regionsData = await $fetch('/data/regions.json')
-  marketsIdMapping = await $fetch('/data/markets.json')
+  // Загружаем основные данные из кешированного API endpoint
+  const commonData = await $fetch('/api/common-data')
+  searchData = commonData.searchData
+  regionsData = commonData.regionsData
+  marketsIdMapping = commonData.marketsIdMapping
 
   // Получаем название рынка (инвертируем маппинг: из {"название": id} в {id: "название"})
   const invertedMapping = Object.fromEntries(
