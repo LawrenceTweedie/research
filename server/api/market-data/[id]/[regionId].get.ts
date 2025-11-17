@@ -45,36 +45,36 @@ export default defineEventHandler((event) => {
     const regionDataAll = getMarketFile(marketId, 'region')
     const regionsTop10Data = getMarketFile(marketId, 'regions_top10')
 
-  // Обрабатываем новости
-  const news = []
-  let i = 1
-  while (newsData[`header ${i}`]) {
-    news.push({
-      title: newsData[`header ${i}`],
-      link: newsData[`link ${i}`]
-    })
-    i++
-  }
+    // Обрабатываем новости
+    const news = []
+    let i = 1
+    while (newsData[`header ${i}`]) {
+      news.push({
+        title: newsData[`header ${i}`],
+        link: newsData[`link ${i}`]
+      })
+      i++
+    }
 
-  // Получаем название рынка
-  const invertedMapping = Object.fromEntries(
-    Object.entries(marketsData).map(([name, id]) => [id, name])
-  )
-  const marketName = invertedMapping[marketId] || 'Неизвестный рынок'
+    // Получаем название рынка
+    const invertedMapping = Object.fromEntries(
+      Object.entries(marketsData).map(([name, id]) => [id, name])
+    )
+    const marketName = invertedMapping[marketId] || 'Неизвестный рынок'
 
-  // Находим регион по ID
-  const region = regionsData.find((r: [string, string]) => r[0] === regionId)
-  const regionName = region ? region[1] : 'Неизвестный регион'
+    // Находим регион по ID
+    const region = regionsData.find((r: [string, string]) => r[0] === regionId)
+    const regionName = region ? region[1] : 'Неизвестный регион'
 
-  // Получаем данные для этого региона
-  const companies = regionsTop10Data[regionName] || []
-  const metrics = regionDataAll[regionName] || {}
+    // Получаем данные для этого региона
+    const companies = regionsTop10Data[regionName] || []
+    const metrics = regionDataAll[regionName] || {}
 
-  // Получаем доступные регионы
-  const regionNames = searchData[marketName] || []
-  const availableRegions = regionsData.filter((r: [string, string]) =>
-    regionNames.includes(r[1])
-  )
+    // Получаем доступные регионы
+    const regionNames = searchData[marketName] || []
+    const availableRegions = regionsData.filter((r: [string, string]) =>
+      regionNames.includes(r[1])
+    )
 
     return {
       marketName,
