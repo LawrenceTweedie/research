@@ -1,4 +1,4 @@
-import { getMarketsData, getRegionsData, getSearchData, getMarketFile } from '~/server/utils/marketData'
+import { getMarketsData, getRegionsData, getSearchData, getMarketFile } from '../../../utils/marketData'
 
 export default defineEventHandler((event) => {
   const marketId = getRouterParam(event, 'id')
