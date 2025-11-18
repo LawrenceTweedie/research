@@ -75,14 +75,18 @@ export default defineEventHandler((event) => {
     regionNames.includes(r[1])
   )
 
-  return {
-    marketName,
-    regionName,
-    activities,
-    news,
+  // Строгая валидация и очистка данных для SSG
+  const cleanedResult = {
+    marketName: String(marketName || 'Неизвестный рынок'),
+    regionName: String(regionName || 'Неизвестный регион'),
+    activities: Array.isArray(activities) ? activities.filter(a => a !== null && a !== undefined) : [],
+    news: Array.isArray(news) ? news.filter(n => n && n.title && n.link) : [],
     newsEmotion: newsData?.emotion || 'нейтрально',
-    companies,
-    metrics,
-    availableRegions
+    companies: Array.isArray(companies) ? companies.filter(c => c !== null && c !== undefined) : [],
+    metrics: typeof metrics === 'object' && metrics !== null ? metrics : {},
+    availableRegions: Array.isArray(availableRegions) ? availableRegions.filter(r => Array.isArray(r) && r.length === 2) : []
   }
+
+  // ВАЖНО: JSON.parse(JSON.stringify()) убирает undefined и другие несериализуемые значения
+  return JSON.parse(JSON.stringify(cleanedResult))
 })
